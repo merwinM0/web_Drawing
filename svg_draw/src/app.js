@@ -15,7 +15,8 @@ var state = {
   isShiftPressed: false,
   currentPreview: null,
   isCropSelecting: false,
-  cropSelectStart: null
+  cropSelectStart: null,
+  brushStyle: "solid"
 };
 var $ = (id) => document.getElementById(id);
 var canvas = $("drawingCanvas");
@@ -33,12 +34,25 @@ function getSVGCoords(e) {
     y: (e.clientY - rect.top) * scaleY
   };
 }
+function getDashArray(brush) {
+  switch (brush) {
+    case "dashed":
+      return "8,5";
+    case "dotted":
+      return "2,4";
+    case "dashdot":
+      return "8,5,2,5";
+    default:
+      return "";
+  }
+}
 function getCurrentStyle() {
   return {
     stroke: state.tool === "eraser" ? "#ffffff" : state.strokeColor,
     strokeWidth: state.tool === "eraser" ? Math.max(state.strokeWidth, 10) : state.strokeWidth,
     fill: state.fillColor,
-    fillEnabled: state.fillEnabled && state.tool !== "pen" && state.tool !== "eraser" && state.tool !== "line"
+    fillEnabled: state.fillEnabled && state.tool !== "pen" && state.tool !== "eraser" && state.tool !== "line",
+    strokeDasharray: getDashArray(state.brushStyle)
   };
 }
 function saveSnapshot() {
@@ -221,12 +235,16 @@ function onPointerDown(e) {
       "stroke-linecap": "round",
       "stroke-linejoin": "round"
     });
+    if (style.strokeDasharray) {
+      path.setAttribute("stroke-dasharray", style.strokeDasharray);
+    }
     drawingLayer.appendChild(path);
     state.currentPreview = path;
   } else {
     const tag = state.tool === "line" ? "line" : state.tool === "rect" ? "rect" : "ellipse";
     previewLayer.innerHTML = "";
     let previewEl;
+    const dashAttr = style.strokeDasharray ? { "stroke-dasharray": style.strokeDasharray } : {};
     if (tag === "line") {
       previewEl = createSVGElement("line", {
         x1: String(pt.x),
@@ -235,7 +253,8 @@ function onPointerDown(e) {
         y2: String(pt.y),
         stroke: style.stroke,
         "stroke-width": String(style.strokeWidth),
-        "stroke-linecap": "round"
+        "stroke-linecap": "round",
+        ...dashAttr
       });
     } else if (tag === "rect") {
       previewEl = createSVGElement("rect", {
@@ -246,7 +265,8 @@ function onPointerDown(e) {
         stroke: style.stroke,
         "stroke-width": String(style.strokeWidth),
         fill: getFillValue(previewEl, style),
-        rx: "0"
+        rx: "0",
+        ...dashAttr
       });
     } else {
       previewEl = createSVGElement("ellipse", {
@@ -256,7 +276,8 @@ function onPointerDown(e) {
         ry: "0",
         stroke: style.stroke,
         "stroke-width": String(style.strokeWidth),
-        fill: getFillValue(previewEl, style)
+        fill: getFillValue(previewEl, style),
+        ...dashAttr
       });
     }
     previewLayer.appendChild(previewEl);
@@ -532,6 +553,17 @@ function init() {
   const fillColorInput = $("fillColor");
   fillColorInput.addEventListener("input", () => {
     state.fillColor = fillColorInput.value;
+  });
+  document.querySelectorAll(".brush-btn[data-brush]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const brush = btn.getAttribute("data-brush");
+      if (brush) {
+        state.brushStyle = brush;
+        document.querySelectorAll(".brush-btn").forEach((b) => {
+          b.classList.toggle("active", b.getAttribute("data-brush") === brush);
+        });
+      }
+    });
   });
   const strokeWidthInput = $("strokeWidth");
   const strokeWidthValue = $("strokeWidthValue");

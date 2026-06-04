@@ -4,6 +4,7 @@
 
 // ---- Types ----
 type ToolType = 'pen' | 'line' | 'rect' | 'circle' | 'eraser';
+type BrushStyle = 'solid' | 'dashed' | 'dotted' | 'dashdot';
 
 interface Point {
   x: number;
@@ -15,6 +16,7 @@ interface ShapeStyle {
   strokeWidth: number;
   fill: string;
   fillEnabled: boolean;
+  strokeDasharray: string;
 }
 
 interface HistoryEntry {
@@ -43,6 +45,9 @@ const state = {
   // For crop selection
   isCropSelecting: false,
   cropSelectStart: null as Point | null,
+
+  // Brush style
+  brushStyle: 'solid' as BrushStyle,
 };
 
 // ---- DOM References ----
@@ -68,12 +73,22 @@ function getSVGCoords(e: MouseEvent): Point {
 }
 
 // ---- Style Getters ----
+function getDashArray(brush: BrushStyle): string {
+  switch (brush) {
+    case 'dashed': return '8,5';
+    case 'dotted': return '2,4';
+    case 'dashdot': return '8,5,2,5';
+    default: return '';
+  }
+}
+
 function getCurrentStyle(): ShapeStyle {
   return {
     stroke: state.tool === 'eraser' ? '#ffffff' : state.strokeColor,
     strokeWidth: state.tool === 'eraser' ? Math.max(state.strokeWidth, 10) : state.strokeWidth,
     fill: state.fillColor,
     fillEnabled: state.fillEnabled && state.tool !== 'pen' && state.tool !== 'eraser' && state.tool !== 'line',
+    strokeDasharray: getDashArray(state.brushStyle),
   };
 }
 
@@ -287,6 +302,9 @@ function onPointerDown(e: MouseEvent): void {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
+    if (style.strokeDasharray) {
+      path.setAttribute('stroke-dasharray', style.strokeDasharray);
+    }
     drawingLayer.appendChild(path);
     state.currentPreview = path;
   } else {
@@ -295,6 +313,7 @@ function onPointerDown(e: MouseEvent): void {
     previewLayer.innerHTML = '';
 
     let previewEl: SVGElement;
+    const dashAttr = style.strokeDasharray ? { 'stroke-dasharray': style.strokeDasharray } : {};
     if (tag === 'line') {
       previewEl = createSVGElement('line', {
         x1: String(pt.x),
@@ -304,6 +323,7 @@ function onPointerDown(e: MouseEvent): void {
         stroke: style.stroke,
         'stroke-width': String(style.strokeWidth),
         'stroke-linecap': 'round',
+        ...dashAttr,
       });
     } else if (tag === 'rect') {
       previewEl = createSVGElement('rect', {
@@ -315,6 +335,7 @@ function onPointerDown(e: MouseEvent): void {
         'stroke-width': String(style.strokeWidth),
         fill: getFillValue(previewEl!, style),
         rx: '0',
+        ...dashAttr,
       });
     } else {
       // ellipse
@@ -326,6 +347,7 @@ function onPointerDown(e: MouseEvent): void {
         stroke: style.stroke,
         'stroke-width': String(style.strokeWidth),
         fill: getFillValue(previewEl!, style),
+        ...dashAttr,
       });
     }
     previewLayer.appendChild(previewEl);
@@ -668,6 +690,19 @@ function init(): void {
   const fillColorInput = $<HTMLInputElement>('fillColor');
   fillColorInput.addEventListener('input', () => {
     state.fillColor = fillColorInput.value;
+  });
+
+  // Brush style buttons
+  document.querySelectorAll('.brush-btn[data-brush]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const brush = btn.getAttribute('data-brush') as BrushStyle;
+      if (brush) {
+        state.brushStyle = brush;
+        document.querySelectorAll('.brush-btn').forEach((b) => {
+          b.classList.toggle('active', b.getAttribute('data-brush') === brush);
+        });
+      }
+    });
   });
 
   // Stroke width

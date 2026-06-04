@@ -110,6 +110,22 @@ body {
   border-color: var(--primary-hover);
 }
 
+.brush-btn {
+  padding: 4px 6px;
+  min-width: 30px;
+  justify-content: center;
+}
+
+.brush-btn.active {
+  background: var(--active-bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.brush-btn svg {
+  display: block;
+}
+
 .small-btn {
   padding: 3px 10px;
   font-size: 12px;
