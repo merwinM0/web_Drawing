@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG 绘图工具</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+      <div class="tool-group">
+        <button class="tool-btn active" data-tool="pen" title="画笔">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="line" title="直线">
+          <svg viewBox="0 0 24 24" width="20" height="20"><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="rect" title="矩形">
+          <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="circle" title="椭圆/圆形">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="eraser" title="橡皮擦">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 01-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0zM4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53-4.95-4.95-4.95 4.95z" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="tool-group">
+        <label class="control-label" title="描边颜色">
+          <span class="label-text">颜色</span>
+          <input type="color" id="strokeColor" value="#1a1a1a" />
+        </label>
+        <label class="control-label" title="描边宽度">
+          <span class="label-text">粗细</span>
+          <input type="range" id="strokeWidth" min="1" max="50" value="3" />
+          <span class="range-value" id="strokeWidthValue">3</span>
+        </label>
+        <label class="control-label" title="填充颜色">
+          <span class="label-text">填充</span>
+          <input type="color" id="fillColor" value="#ff6b6b" />
+        </label>
+        <label class="control-label" title="填充开关">
+          <input type="checkbox" id="fillToggle" />
+          <span class="toggle-label">填充</span>
+        </label>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="tool-group">
+        <button class="tool-btn" id="undoBtn" title="撤销 (Ctrl+Z)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" fill="currentColor"/></svg>
+        </button>
+        <button class="tool-btn" id="redoBtn" title="重做 (Ctrl+Shift+Z)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M11.5 8c-4.65 0-8.58 3.03-9.97 7.22l2.37.78c1.05-3.19 4.06-5.5 7.6-5.5 1.96 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6C16.55 8.99 14.15 8 11.5 8z" fill="currentColor"/></svg>
+        </button>
+        <button class="tool-btn" id="clearBtn" title="清空画布">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="tool-group">
+        <button class="tool-btn action-btn" id="exportDialogBtn" title="导出">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+          <span>导出</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 画布区域 -->
+    <div class="canvas-container">
+      <svg id="drawingCanvas"
+           xmlns="http://www.w3.org/2000/svg"
+           width="1000"
+           height="700"
+           viewBox="0 0 1000 700">
+        <!-- 背景 -->
+        <rect width="100%" height="100%" fill="#ffffff" class="canvas-bg" />
+        <!-- 临时预览元素放置在这里 -->
+        <g id="previewLayer"></g>
+        <!-- 所有绘制的元素 -->
+        <g id="drawingLayer"></g>
+      </svg>
+      <div class="size-info" id="sizeInfo">1000 × 700</div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="statusbar">
+      <span id="coordDisplay">坐标: — , —</span>
+      <span id="elementCount">元素: 0</span>
+      <span>拖拽即可绘画 | Ctrl+Z 撤销 | Ctrl+Shift+Z 重做</span>
+    </div>
+  </div>
+
+  <!-- 导出弹窗 -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>导出设置</h3>
+        <button class="modal-close" id="modalCloseBtn" title="关闭">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- 背景选项 -->
+        <div class="export-section">
+          <label class="export-field">
+            <input type="checkbox" id="exportIncludeBg" checked />
+            <span>包含白色背景</span>
+          </label>
+        </div>
+
+        <!-- 裁剪区域 -->
+        <div class="export-section">
+          <div class="section-title">
+            <span>裁剪区域 (viewBox)</span>
+            <button class="tool-btn small-btn" id="resetCropBtn" title="重置为全画布">重置</button>
+          </div>
+          <div class="crop-grid">
+            <label class="crop-field">
+              <span class="crop-label">X</span>
+              <input type="number" id="cropX" value="0" min="0" />
+            </label>
+            <label class="crop-field">
+              <span class="crop-label">Y</span>
+              <input type="number" id="cropY" value="0" min="0" />
+            </label>
+            <label class="crop-field">
+              <span class="crop-label">宽度</span>
+              <input type="number" id="cropW" value="1000" min="1" />
+            </label>
+            <label class="crop-field">
+              <span class="crop-label">高度</span>
+              <input type="number" id="cropH" value="700" min="1" />
+            </label>
+          </div>
+          <label class="export-field">
+            <input type="checkbox" id="cropLockAspect" />
+            <span>锁定宽高比</span>
+          </label>
+          <div class="export-info" id="exportInfo">导出尺寸: 1000 × 700</div>
+        </div>
+
+        <!-- 画布上显示裁剪预览 -->
+        <div class="export-section">
+          <label class="export-field">
+            <input type="checkbox" id="showCropPreview" />
+            <span>在画布上显示裁剪区域</span>
+          </label>
+          <div style="margin-top: 8px;">
+            <button class="tool-btn" id="cropSelectBtn" title="在画布上拖拽选择裁剪区域">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 3H3v2h16v16h2V3zM17 13h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" fill="currentColor"/></svg>
+              <span>在画布上选择</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="tool-btn" id="exportPngBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/></svg>
+          <span>导出 PNG</span>
+        </button>
+        <button class="tool-btn action-btn" id="exportSvgBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+          <span>导出 SVG</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

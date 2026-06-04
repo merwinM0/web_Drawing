@@ -1,0 +1,17 @@
+{
+  "name": "svg_draw",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/app.ts --outdir=src --target=browser",
+    "watch": "bun build src/app.ts --outdir=src --target=browser --watch",
+    "dev": "bun build src/app.ts --outdir=src --target=browser && npx serve src -p 3000 --no-clipboard --single",
+    "start": "npx serve src -p 3000 --no-clipboard --single"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
