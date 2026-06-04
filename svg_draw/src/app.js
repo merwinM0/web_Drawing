@@ -14,8 +14,6 @@ var state = {
   isCtrlPressed: false,
   isShiftPressed: false,
   currentPreview: null,
-  isCropSelecting: false,
-  cropSelectStart: null,
   brushStyle: "solid"
 };
 var $ = (id) => document.getElementById(id);
@@ -107,84 +105,6 @@ function updateUndoRedoButtons() {
   undoBtn.style.opacity = state.historyIndex <= 0 ? "0.4" : "1";
   redoBtn.style.opacity = state.historyIndex >= state.history.length - 1 ? "0.4" : "1";
 }
-function enterCropSelectMode() {
-  state.isCropSelecting = true;
-  canvas.classList.add("crop-selecting");
-  state.isDrawing = false;
-  state.currentPreview = null;
-  state.startPoint = null;
-  previewLayer.innerHTML = "";
-  $("cropSelectBtn").classList.add("active");
-}
-function exitCropSelectMode() {
-  state.isCropSelecting = false;
-  state.isDrawing = false;
-  state.cropSelectStart = null;
-  state.currentPreview = null;
-  previewLayer.innerHTML = "";
-  canvas.classList.remove("crop-selecting");
-  $("cropSelectBtn").classList.remove("active");
-}
-function onCropSelectPointerDown(e) {
-  if (e.button !== 0)
-    return;
-  state.isDrawing = true;
-  const pt = getSVGCoords(e);
-  state.cropSelectStart = pt;
-  previewLayer.innerHTML = "";
-  const rect = createSVGElement("rect", {
-    x: String(pt.x),
-    y: String(pt.y),
-    width: "0",
-    height: "0",
-    stroke: "#4a6cf7",
-    "stroke-width": "1.5",
-    "stroke-dasharray": "6,3",
-    fill: "rgba(74, 108, 247, 0.08)"
-  });
-  previewLayer.appendChild(rect);
-  state.currentPreview = rect;
-}
-function onCropSelectPointerMove(e) {
-  if (!state.isDrawing || !state.cropSelectStart)
-    return;
-  const pt = getSVGCoords(e);
-  const start = state.cropSelectStart;
-  const x = Math.min(start.x, pt.x);
-  const y = Math.min(start.y, pt.y);
-  const w = Math.abs(pt.x - start.x);
-  const h = Math.abs(pt.y - start.y);
-  if (state.currentPreview) {
-    state.currentPreview.setAttribute("x", String(x));
-    state.currentPreview.setAttribute("y", String(y));
-    state.currentPreview.setAttribute("width", String(w));
-    state.currentPreview.setAttribute("height", String(h));
-  }
-}
-function onCropSelectPointerUp(e) {
-  if (!state.isDrawing || !state.cropSelectStart)
-    return;
-  state.isDrawing = false;
-  const pt = getSVGCoords(e);
-  const start = state.cropSelectStart;
-  const x = Math.min(start.x, pt.x);
-  const y = Math.min(start.y, pt.y);
-  const w = Math.abs(pt.x - start.x);
-  const h = Math.abs(pt.y - start.y);
-  if (w > 5 && h > 5) {
-    $("cropX").value = String(Math.round(x));
-    $("cropY").value = String(Math.round(y));
-    $("cropW").value = String(Math.round(w));
-    $("cropH").value = String(Math.round(h));
-    updateExportInfo();
-    toggleCropOverlay(true);
-    $("showCropPreview").checked = true;
-  }
-  previewLayer.innerHTML = "";
-  state.cropSelectStart = null;
-  state.currentPreview = null;
-  exitCropSelectMode();
-}
 function createSVGElement(tag, attrs) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
   for (const [key, value] of Object.entries(attrs)) {
@@ -217,10 +137,6 @@ function getFillValue(el, style) {
 function onPointerDown(e) {
   if (e.button !== 0)
     return;
-  if (state.isCropSelecting) {
-    onCropSelectPointerDown(e);
-    return;
-  }
   state.isDrawing = true;
   const pt = getSVGCoords(e);
   state.startPoint = pt;
@@ -289,10 +205,6 @@ function onPointerMove(e) {
   coordInfoEl.textContent = `坐标: ${Math.round(pt.x)}, ${Math.round(pt.y)}`;
   if (!state.isDrawing)
     return;
-  if (state.isCropSelecting) {
-    onCropSelectPointerMove(e);
-    return;
-  }
   const style = getCurrentStyle();
   if (state.tool === "pen" || state.tool === "eraser") {
     state.currentPath.push(pt);
@@ -343,10 +255,6 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (!state.isDrawing)
     return;
-  if (state.isCropSelecting) {
-    onCropSelectPointerUp(e);
-    return;
-  }
   state.isDrawing = false;
   const style = getCurrentStyle();
   if (state.tool === "pen" || state.tool === "eraser") {
@@ -398,13 +306,10 @@ function buildExportClone() {
     if (bgRect)
       bgRect.remove();
   }
-  const cropX = parseInt($("cropX").value, 10) || 0;
-  const cropY = parseInt($("cropY").value, 10) || 0;
-  const cropW = parseInt($("cropW").value, 10) || 1;
-  const cropH = parseInt($("cropH").value, 10) || 1;
-  clone.setAttribute("viewBox", `${cropX} ${cropY} ${cropW} ${cropH}`);
-  clone.setAttribute("width", String(cropW));
-  clone.setAttribute("height", String(cropH));
+  const vb = canvas.viewBox.baseVal;
+  clone.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.width} ${vb.height}`);
+  clone.setAttribute("width", String(vb.width));
+  clone.setAttribute("height", String(vb.height));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
   return clone;
@@ -425,8 +330,9 @@ function exportPNG() {
   const svgString = serializer.serializeToString(clone);
   const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
-  const cropW = parseInt($("cropW").value, 10) || 1000;
-  const cropH = parseInt($("cropH").value, 10) || 700;
+  const vb = canvas.viewBox.baseVal;
+  const cropW = vb.width;
+  const cropH = vb.height;
   const img = new Image;
   img.onload = () => {
     const c = document.createElement("canvas");
@@ -464,61 +370,14 @@ function downloadBlob(blob, ext) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
-var cropOverlayRect = null;
 function openExportDialog() {
   const vb = canvas.viewBox.baseVal;
-  $("cropX").value = "0";
-  $("cropY").value = "0";
-  $("cropW").value = String(vb.width);
-  $("cropH").value = String(vb.height);
-  updateExportInfo();
+  $("exportInfo").textContent = `导出尺寸: ${vb.width} × ${vb.height}`;
   $("exportModal").classList.add("active");
-  removeCropOverlay();
-  $("showCropPreview").checked = false;
 }
 function closeExportDialog() {
   $("exportModal").classList.remove("active");
-  removeCropOverlay();
-  exitCropSelectMode();
 }
-function updateExportInfo() {
-  const w = parseInt($("cropW").value, 10) || 0;
-  const h = parseInt($("cropH").value, 10) || 0;
-  $("exportInfo").textContent = `导出尺寸: ${w} × ${h}`;
-}
-function resetCrop() {
-  $("cropX").value = "0";
-  $("cropY").value = "0";
-  const vb = canvas.viewBox.baseVal;
-  $("cropW").value = String(vb.width);
-  $("cropH").value = String(vb.height);
-  updateExportInfo();
-}
-function toggleCropOverlay(show) {
-  removeCropOverlay();
-  if (!show)
-    return;
-  const x = parseInt($("cropX").value, 10) || 0;
-  const y = parseInt($("cropY").value, 10) || 0;
-  const w = parseInt($("cropW").value, 10) || 0;
-  const h = parseInt($("cropH").value, 10) || 0;
-  if (w <= 0 || h <= 0)
-    return;
-  cropOverlayRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  cropOverlayRect.setAttribute("class", "crop-overlay");
-  cropOverlayRect.setAttribute("x", String(x));
-  cropOverlayRect.setAttribute("y", String(y));
-  cropOverlayRect.setAttribute("width", String(w));
-  cropOverlayRect.setAttribute("height", String(h));
-  canvas.insertBefore(cropOverlayRect, previewLayer);
-}
-function removeCropOverlay() {
-  if (cropOverlayRect && cropOverlayRect.parentNode) {
-    cropOverlayRect.parentNode.removeChild(cropOverlayRect);
-  }
-  cropOverlayRect = null;
-}
-var lastCropField = null;
 function clearCanvas() {
   if (state.elementCount === 0)
     return;
@@ -601,9 +460,6 @@ function init() {
       e.preventDefault();
       redo();
     } else if (e.key === "Escape") {
-      if (state.isCropSelecting) {
-        exitCropSelectMode();
-      }
       if ($("exportModal").classList.contains("active")) {
         closeExportDialog();
       } else if (state.isDrawing) {
@@ -629,60 +485,10 @@ function init() {
   $("modalCloseBtn").addEventListener("click", closeExportDialog);
   $("exportSvgBtn").addEventListener("click", exportSVG);
   $("exportPngBtn").addEventListener("click", exportPNG);
-  $("resetCropBtn").addEventListener("click", resetCrop);
   const modalOverlay = $("exportModal");
   modalOverlay.addEventListener("click", (e) => {
     if (e.target === modalOverlay)
       closeExportDialog();
-  });
-  const cropInputs = ["cropX", "cropY", "cropW", "cropH"];
-  cropInputs.forEach((id) => {
-    const el = $(id);
-    el.addEventListener("input", () => {
-      updateExportInfo();
-      if ($("showCropPreview").checked) {
-        toggleCropOverlay(true);
-      }
-    });
-  });
-  const cropW = $("cropW");
-  const cropH = $("cropH");
-  cropW.addEventListener("focus", () => {
-    lastCropField = "w";
-  });
-  cropH.addEventListener("focus", () => {
-    lastCropField = "h";
-  });
-  const lockAspect = $("cropLockAspect");
-  cropW.addEventListener("input", () => {
-    if (lockAspect.checked && lastCropField === "w") {
-      const w = parseInt(cropW.value, 10) || 1;
-      const vb = canvas.viewBox.baseVal;
-      const ratio = vb.height / vb.width;
-      cropH.value = String(Math.round(w * ratio));
-      updateExportInfo();
-    }
-  });
-  cropH.addEventListener("input", () => {
-    if (lockAspect.checked && lastCropField === "h") {
-      const h = parseInt(cropH.value, 10) || 1;
-      const vb = canvas.viewBox.baseVal;
-      const ratio = vb.width / vb.height;
-      cropW.value = String(Math.round(h * ratio));
-      updateExportInfo();
-    }
-  });
-  $("showCropPreview").addEventListener("change", (e) => {
-    const checked = e.target.checked;
-    toggleCropOverlay(checked);
-  });
-  const cropSelectBtn = $("cropSelectBtn");
-  cropSelectBtn.addEventListener("click", () => {
-    if (state.isCropSelecting) {
-      exitCropSelectMode();
-    } else {
-      enterCropSelectMode();
-    }
   });
   saveSnapshot();
   setTool("pen");

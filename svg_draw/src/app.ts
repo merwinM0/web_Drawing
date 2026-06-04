@@ -42,10 +42,6 @@ const state = {
   // For shape preview
   currentPreview: null as SVGElement | null,
 
-  // For crop selection
-  isCropSelecting: false,
-  cropSelectStart: null as Point | null,
-
   // Brush style
   brushStyle: 'solid' as BrushStyle,
 };
@@ -153,92 +149,6 @@ function updateUndoRedoButtons(): void {
   redoBtn.style.opacity = state.historyIndex >= state.history.length - 1 ? '0.4' : '1';
 }
 
-// ---- Crop Selection Handlers ----
-function enterCropSelectMode(): void {
-  state.isCropSelecting = true;
-  canvas.classList.add('crop-selecting');
-  // Cancel any ongoing drawing
-  state.isDrawing = false;
-  state.currentPreview = null;
-  state.startPoint = null;
-  previewLayer.innerHTML = '';
-  $<HTMLButtonElement>('cropSelectBtn').classList.add('active');
-}
-
-function exitCropSelectMode(): void {
-  state.isCropSelecting = false;
-  state.isDrawing = false;
-  state.cropSelectStart = null;
-  state.currentPreview = null;
-  previewLayer.innerHTML = '';
-  canvas.classList.remove('crop-selecting');
-  $<HTMLButtonElement>('cropSelectBtn').classList.remove('active');
-}
-
-function onCropSelectPointerDown(e: MouseEvent): void {
-  if (e.button !== 0) return;
-  state.isDrawing = true;
-  const pt = getSVGCoords(e);
-  state.cropSelectStart = pt;
-
-  previewLayer.innerHTML = '';
-  const rect = createSVGElement('rect', {
-    x: String(pt.x),
-    y: String(pt.y),
-    width: '0',
-    height: '0',
-    stroke: '#4a6cf7',
-    'stroke-width': '1.5',
-    'stroke-dasharray': '6,3',
-    fill: 'rgba(74, 108, 247, 0.08)',
-  });
-  previewLayer.appendChild(rect);
-  state.currentPreview = rect;
-}
-
-function onCropSelectPointerMove(e: MouseEvent): void {
-  if (!state.isDrawing || !state.cropSelectStart) return;
-  const pt = getSVGCoords(e);
-  const start = state.cropSelectStart;
-  const x = Math.min(start.x, pt.x);
-  const y = Math.min(start.y, pt.y);
-  const w = Math.abs(pt.x - start.x);
-  const h = Math.abs(pt.y - start.y);
-  if (state.currentPreview) {
-    state.currentPreview.setAttribute('x', String(x));
-    state.currentPreview.setAttribute('y', String(y));
-    state.currentPreview.setAttribute('width', String(w));
-    state.currentPreview.setAttribute('height', String(h));
-  }
-}
-
-function onCropSelectPointerUp(e: MouseEvent): void {
-  if (!state.isDrawing || !state.cropSelectStart) return;
-  state.isDrawing = false;
-
-  const pt = getSVGCoords(e);
-  const start = state.cropSelectStart;
-  const x = Math.min(start.x, pt.x);
-  const y = Math.min(start.y, pt.y);
-  const w = Math.abs(pt.x - start.x);
-  const h = Math.abs(pt.y - start.y);
-
-  if (w > 5 && h > 5) {
-    $<HTMLInputElement>('cropX').value = String(Math.round(x));
-    $<HTMLInputElement>('cropY').value = String(Math.round(y));
-    $<HTMLInputElement>('cropW').value = String(Math.round(w));
-    $<HTMLInputElement>('cropH').value = String(Math.round(h));
-    updateExportInfo();
-    toggleCropOverlay(true);
-    $<HTMLInputElement>('showCropPreview').checked = true;
-  }
-
-  previewLayer.innerHTML = '';
-  state.cropSelectStart = null;
-  state.currentPreview = null;
-  exitCropSelectMode();
-}
-
 // ---- Drawing Functions ----
 
 /** Create an SVG element with attributes */
@@ -281,10 +191,6 @@ function getFillValue(el: SVGElement, style: ShapeStyle): string {
 
 function onPointerDown(e: MouseEvent): void {
   if (e.button !== 0) return; // left click only
-  if (state.isCropSelecting) {
-    onCropSelectPointerDown(e);
-    return;
-  }
   state.isDrawing = true;
   const pt = getSVGCoords(e);
   state.startPoint = pt;
@@ -362,10 +268,6 @@ function onPointerMove(e: MouseEvent): void {
   coordInfoEl.textContent = `坐标: ${Math.round(pt.x)}, ${Math.round(pt.y)}`;
 
   if (!state.isDrawing) return;
-  if (state.isCropSelecting) {
-    onCropSelectPointerMove(e);
-    return;
-  }
 
   const style = getCurrentStyle();
 
@@ -422,10 +324,6 @@ function onPointerMove(e: MouseEvent): void {
 
 function onPointerUp(e: MouseEvent): void {
   if (!state.isDrawing) return;
-  if (state.isCropSelecting) {
-    onCropSelectPointerUp(e);
-    return;
-  }
   state.isDrawing = false;
 
   const style = getCurrentStyle();
@@ -502,15 +400,11 @@ function buildExportClone(): SVGSVGElement {
     if (bgRect) bgRect.remove();
   }
 
-  // Apply crop (viewBox)
-  const cropX = parseInt($<HTMLInputElement>('cropX').value, 10) || 0;
-  const cropY = parseInt($<HTMLInputElement>('cropY').value, 10) || 0;
-  const cropW = parseInt($<HTMLInputElement>('cropW').value, 10) || 1;
-  const cropH = parseInt($<HTMLInputElement>('cropH').value, 10) || 1;
-
-  clone.setAttribute('viewBox', `${cropX} ${cropY} ${cropW} ${cropH}`);
-  clone.setAttribute('width', String(cropW));
-  clone.setAttribute('height', String(cropH));
+  // Keep full canvas viewBox
+  const vb = canvas.viewBox.baseVal;
+  clone.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.width} ${vb.height}`);
+  clone.setAttribute('width', String(vb.width));
+  clone.setAttribute('height', String(vb.height));
 
   // Ensure proper XML namespace
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -537,8 +431,9 @@ function exportPNG(): void {
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
 
-  const cropW = parseInt($<HTMLInputElement>('cropW').value, 10) || 1000;
-  const cropH = parseInt($<HTMLInputElement>('cropH').value, 10) || 700;
+  const vb = canvas.viewBox.baseVal;
+  const cropW = vb.width;
+  const cropH = vb.height;
 
   const img = new Image();
   img.onload = () => {
@@ -583,72 +478,15 @@ function downloadBlob(blob: Blob, ext: 'svg' | 'png'): void {
 
 // ---- Export Dialog ----
 
-let cropOverlayRect: SVGRectElement | null = null;
-
 function openExportDialog(): void {
-  // Reset form to current canvas values
   const vb = canvas.viewBox.baseVal;
-  $<HTMLInputElement>('cropX').value = '0';
-  $<HTMLInputElement>('cropY').value = '0';
-  $<HTMLInputElement>('cropW').value = String(vb.width);
-  $<HTMLInputElement>('cropH').value = String(vb.height);
-  updateExportInfo();
+  $<HTMLElement>('exportInfo').textContent = `导出尺寸: ${vb.width} × ${vb.height}`;
   $<HTMLElement>('exportModal').classList.add('active');
-  removeCropOverlay();
-  $<HTMLInputElement>('showCropPreview').checked = false;
 }
 
 function closeExportDialog(): void {
   $<HTMLElement>('exportModal').classList.remove('active');
-  removeCropOverlay();
-  exitCropSelectMode();
 }
-
-function updateExportInfo(): void {
-  const w = parseInt($<HTMLInputElement>('cropW').value, 10) || 0;
-  const h = parseInt($<HTMLInputElement>('cropH').value, 10) || 0;
-  $<HTMLElement>('exportInfo').textContent = `导出尺寸: ${w} × ${h}`;
-}
-
-function resetCrop(): void {
-  $<HTMLInputElement>('cropX').value = '0';
-  $<HTMLInputElement>('cropY').value = '0';
-  const vb = canvas.viewBox.baseVal;
-  $<HTMLInputElement>('cropW').value = String(vb.width);
-  $<HTMLInputElement>('cropH').value = String(vb.height);
-  updateExportInfo();
-}
-
-function toggleCropOverlay(show: boolean): void {
-  removeCropOverlay();
-  if (!show) return;
-
-  const x = parseInt($<HTMLInputElement>('cropX').value, 10) || 0;
-  const y = parseInt($<HTMLInputElement>('cropY').value, 10) || 0;
-  const w = parseInt($<HTMLInputElement>('cropW').value, 10) || 0;
-  const h = parseInt($<HTMLInputElement>('cropH').value, 10) || 0;
-
-  if (w <= 0 || h <= 0) return;
-
-  cropOverlayRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  cropOverlayRect.setAttribute('class', 'crop-overlay');
-  cropOverlayRect.setAttribute('x', String(x));
-  cropOverlayRect.setAttribute('y', String(y));
-  cropOverlayRect.setAttribute('width', String(w));
-  cropOverlayRect.setAttribute('height', String(h));
-  // Insert before previewLayer so it appears on top
-  canvas.insertBefore(cropOverlayRect, previewLayer);
-}
-
-function removeCropOverlay(): void {
-  if (cropOverlayRect && cropOverlayRect.parentNode) {
-    cropOverlayRect.parentNode.removeChild(cropOverlayRect);
-  }
-  cropOverlayRect = null;
-}
-
-// Track the last non-focused crop field for aspect ratio lock
-let lastCropField: 'w' | 'h' | null = null;
 
 function clearCanvas(): void {
   if (state.elementCount === 0) return;
@@ -750,9 +588,6 @@ function init(): void {
       e.preventDefault();
       redo();
     } else if (e.key === 'Escape') {
-      if (state.isCropSelecting) {
-        exitCropSelectMode();
-      }
       if ($<HTMLElement>('exportModal').classList.contains('active')) {
         closeExportDialog();
       } else if (state.isDrawing) {
@@ -787,66 +622,11 @@ function init(): void {
   $<HTMLButtonElement>('modalCloseBtn').addEventListener('click', closeExportDialog);
   $<HTMLButtonElement>('exportSvgBtn').addEventListener('click', exportSVG);
   $<HTMLButtonElement>('exportPngBtn').addEventListener('click', exportPNG);
-  $<HTMLButtonElement>('resetCropBtn').addEventListener('click', resetCrop);
 
   // Close modal on overlay click
   const modalOverlay = $<HTMLElement>('exportModal');
   modalOverlay.addEventListener('click', (e) => {
     if (e.target === modalOverlay) closeExportDialog();
-  });
-
-  // Crop input events — update info & overlays
-  const cropInputs: (keyof HTMLInputElement)[] = ['cropX', 'cropY', 'cropW', 'cropH'];
-  cropInputs.forEach(id => {
-    const el = $<HTMLInputElement>(id);
-    el.addEventListener('input', () => {
-      updateExportInfo();
-      if ($<HTMLInputElement>('showCropPreview').checked) {
-        toggleCropOverlay(true);
-      }
-    });
-  });
-
-  // Aspect ratio lock
-  const cropW = $<HTMLInputElement>('cropW');
-  const cropH = $<HTMLInputElement>('cropH');
-  cropW.addEventListener('focus', () => { lastCropField = 'w'; });
-  cropH.addEventListener('focus', () => { lastCropField = 'h'; });
-
-  const lockAspect = $<HTMLInputElement>('cropLockAspect');
-  cropW.addEventListener('input', () => {
-    if (lockAspect.checked && lastCropField === 'w') {
-      const w = parseInt(cropW.value, 10) || 1;
-      const vb = canvas.viewBox.baseVal;
-      const ratio = vb.height / vb.width;
-      cropH.value = String(Math.round(w * ratio));
-      updateExportInfo();
-    }
-  });
-  cropH.addEventListener('input', () => {
-    if (lockAspect.checked && lastCropField === 'h') {
-      const h = parseInt(cropH.value, 10) || 1;
-      const vb = canvas.viewBox.baseVal;
-      const ratio = vb.width / vb.height;
-      cropW.value = String(Math.round(h * ratio));
-      updateExportInfo();
-    }
-  });
-
-  // Show crop preview on canvas
-  $<HTMLInputElement>('showCropPreview').addEventListener('change', (e) => {
-    const checked = (e.target as HTMLInputElement).checked;
-    toggleCropOverlay(checked);
-  });
-
-  // Crop select button
-  const cropSelectBtn = $<HTMLButtonElement>('cropSelectBtn');
-  cropSelectBtn.addEventListener('click', () => {
-    if (state.isCropSelecting) {
-      exitCropSelectMode();
-    } else {
-      enterCropSelectMode();
-    }
   });
 
   // Initial snapshot
