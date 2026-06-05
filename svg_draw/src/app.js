@@ -24,14 +24,12 @@ var previewLayer = $("previewLayer");
 var elementCountEl = $("elementCount");
 var coordInfoEl = $("coordDisplay");
 function getSVGCoords(e) {
-  const rect = canvas.getBoundingClientRect();
-  const viewBox = canvas.viewBox.baseVal;
-  const scaleX = viewBox.width / rect.width;
-  const scaleY = viewBox.height / rect.height;
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
-  };
+  const pt = canvas.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = canvas.getScreenCTM();
+  const svgPt = pt.matrixTransform(ctm.inverse());
+  return { x: svgPt.x, y: svgPt.y };
 }
 function getDashArray(brush) {
   switch (brush) {

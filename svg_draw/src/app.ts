@@ -62,14 +62,12 @@ const coordInfoEl = $<HTMLElement>('coordDisplay');
 
 // ---- Coordinate Helpers ----
 function getSVGCoords(e: MouseEvent): Point {
-  const rect = canvas.getBoundingClientRect();
-  const viewBox = canvas.viewBox.baseVal;
-  const scaleX = viewBox.width / rect.width;
-  const scaleY = viewBox.height / rect.height;
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
-  };
+  const pt = canvas.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = canvas.getScreenCTM()!;
+  const svgPt = pt.matrixTransform(ctm.inverse());
+  return { x: svgPt.x, y: svgPt.y };
 }
 
 // ---- Style Getters ----
