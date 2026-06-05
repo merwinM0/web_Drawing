@@ -65,6 +65,22 @@
         <button class="tool-btn brush-btn" data-brush="dashdot" title="点划线">
           <svg viewBox="0 0 24 12" width="22" height="11"><line x1="2" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="6,4,1,4"/></svg>
         </button>
+        <button class="tool-btn brush-btn" data-brush="marker" title="马克笔（半透明）">
+          <svg viewBox="0 0 24 12" width="22" height="11"><line x1="2" y1="6" x2="22" y2="6" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity="0.5"/></svg>
+        </button>
+        <button class="tool-btn brush-btn" data-brush="double" title="双线笔">
+          <svg viewBox="0 0 24 12" width="22" height="11"><g><line x1="2" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="8" x2="22" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></g></svg>
+        </button>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="tool-group">
+        <label class="control-label" title="不透明度">
+          <span class="label-text">透明</span>
+          <input type="range" id="strokeOpacity" min="0.1" max="1" step="0.05" value="1" />
+          <span class="range-value" id="strokeOpacityValue">100%</span>
+        </label>
       </div>
 
       <div class="separator"></div>

@@ -14,7 +14,8 @@ var state = {
   isCtrlPressed: false,
   isShiftPressed: false,
   currentPreview: null,
-  brushStyle: "solid"
+  brushStyle: "solid",
+  opacity: 1
 };
 var $ = (id) => document.getElementById(id);
 var canvas = $("drawingCanvas");
@@ -40,6 +41,10 @@ function getDashArray(brush) {
       return "2,4";
     case "dashdot":
       return "8,5,2,5";
+    case "marker":
+      return "";
+    case "double":
+      return "0,6";
     default:
       return "";
   }
@@ -50,7 +55,8 @@ function getCurrentStyle() {
     strokeWidth: state.tool === "eraser" ? Math.max(state.strokeWidth, 10) : state.strokeWidth,
     fill: state.fillColor,
     fillEnabled: state.fillEnabled && state.tool !== "pen" && state.tool !== "eraser" && state.tool !== "line",
-    strokeDasharray: getDashArray(state.brushStyle)
+    strokeDasharray: getDashArray(state.brushStyle),
+    opacity: state.brushStyle === "marker" ? Math.min(state.opacity, 0.5) : state.opacity
   };
 }
 function saveSnapshot() {
@@ -154,6 +160,22 @@ function onPointerDown(e) {
     if (style.strokeDasharray) {
       path.setAttribute("stroke-dasharray", style.strokeDasharray);
     }
+    if (style.opacity < 1) {
+      path.setAttribute("stroke-opacity", String(style.opacity));
+    }
+    if (state.brushStyle === "double" && state.tool !== "eraser") {
+      const innerPath = createSVGElement("path", {
+        d: `M${pt.x},${pt.y}`,
+        fill: "none",
+        stroke: style.stroke,
+        "stroke-width": String(Math.max(1, style.strokeWidth * 0.4)),
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "stroke-opacity": "0.5"
+      });
+      innerPath.style.pointerEvents = "none";
+      drawingLayer.appendChild(innerPath);
+    }
     drawingLayer.appendChild(path);
     state.currentPreview = path;
   } else {
@@ -180,7 +202,7 @@ function onPointerDown(e) {
         height: "0",
         stroke: style.stroke,
         "stroke-width": String(style.strokeWidth),
-        fill: getFillValue(previewEl, style),
+        fill: style.fillEnabled ? style.fill : "none",
         rx: "0",
         ...dashAttr
       });
@@ -192,9 +214,12 @@ function onPointerDown(e) {
         ry: "0",
         stroke: style.stroke,
         "stroke-width": String(style.strokeWidth),
-        fill: getFillValue(previewEl, style),
+        fill: style.fillEnabled ? style.fill : "none",
         ...dashAttr
       });
+    }
+    if (style.opacity < 1) {
+      previewEl.setAttribute("stroke-opacity", String(style.opacity));
     }
     previewLayer.appendChild(previewEl);
     state.currentPreview = previewEl;
@@ -211,6 +236,12 @@ function onPointerMove(e) {
     if (state.currentPreview) {
       const d = buildSmoothPath(state.currentPath);
       state.currentPreview.setAttribute("d", d);
+      if (state.brushStyle === "double" && state.currentPreview.previousSibling) {
+        const prev = state.currentPreview.previousSibling;
+        if (prev.tagName === "path" && prev.getAttribute("stroke-opacity") === "0.5") {
+          prev.setAttribute("d", d);
+        }
+      }
     }
   } else if (state.currentPreview && state.startPoint) {
     const start = state.startPoint;
@@ -219,11 +250,13 @@ function onPointerMove(e) {
     if (state.isShiftPressed) {
       const dx = x2 - x1;
       const dy = y2 - y1;
-      const angle = Math.atan2(dy, dx);
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
-      x2 = x1 + len * Math.cos(snapped);
-      y2 = y1 + len * Math.sin(snapped);
+      if (state.tool === "line") {
+        const angle = Math.atan2(dy, dx);
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        x2 = x1 + len * Math.cos(snapped);
+        y2 = y1 + len * Math.sin(snapped);
+      } else if (state.tool === "rect") {} else if (state.tool === "circle") {}
     }
     const tag = state.tool;
     if (tag === "line") {
@@ -234,17 +267,27 @@ function onPointerMove(e) {
     } else if (tag === "rect") {
       const rx = Math.min(x1, x2);
       const ry = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1);
-      const h = Math.abs(y2 - y1);
+      let w = Math.abs(x2 - x1);
+      let h = Math.abs(y2 - y1);
+      if (state.isShiftPressed) {
+        const side = Math.max(w, h);
+        w = side;
+        h = side;
+      }
       state.currentPreview.setAttribute("x", String(rx));
       state.currentPreview.setAttribute("y", String(ry));
       state.currentPreview.setAttribute("width", String(w));
       state.currentPreview.setAttribute("height", String(h));
     } else if (tag === "circle") {
-      const cx = (x1 + x2) / 2;
-      const cy = (y1 + y2) / 2;
-      const rx = Math.abs(x2 - x1) / 2;
-      const ry = Math.abs(y2 - y1) / 2;
+      let cx = (x1 + x2) / 2;
+      let cy = (y1 + y2) / 2;
+      let rx = Math.abs(x2 - x1) / 2;
+      let ry = Math.abs(y2 - y1) / 2;
+      if (state.isShiftPressed) {
+        const r = Math.max(rx, ry);
+        rx = r;
+        ry = r;
+      }
       state.currentPreview.setAttribute("cx", String(cx));
       state.currentPreview.setAttribute("cy", String(cy));
       state.currentPreview.setAttribute("rx", String(rx));
@@ -274,11 +317,21 @@ function onPointerUp(e) {
       if (state.isShiftPressed) {
         const dx = x2 - start.x;
         const dy = y2 - start.y;
-        const angle = Math.atan2(dy, dx);
-        const len = Math.sqrt(dx * dx + dy * dy);
-        const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
-        x2 = start.x + len * Math.cos(snapped);
-        y2 = start.y + len * Math.sin(snapped);
+        if (state.tool === "line") {
+          const angle = Math.atan2(dy, dx);
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+          x2 = start.x + len * Math.cos(snapped);
+          y2 = start.y + len * Math.sin(snapped);
+        } else if (state.tool === "rect") {
+          const side = Math.max(Math.abs(dx), Math.abs(dy));
+          x2 = start.x + Math.sign(dx) * side;
+          y2 = start.y + Math.sign(dy) * side;
+        } else if (state.tool === "circle") {
+          const r = Math.max(Math.abs(dx), Math.abs(dy));
+          x2 = start.x + Math.sign(dx) * r;
+          y2 = start.y + Math.sign(dy) * r;
+        }
       }
       const hasSize = state.tool === "line" && (Math.abs(x2 - start.x) > 1 || Math.abs(y2 - start.y) > 1) || state.tool === "rect" && (Math.abs(x2 - start.x) > 1 || Math.abs(y2 - start.y) > 1) || state.tool === "circle" && (Math.abs(x2 - start.x) > 1 || Math.abs(y2 - start.y) > 1);
       if (hasSize) {
@@ -434,6 +487,14 @@ function init() {
   fillToggle.addEventListener("change", () => {
     state.fillEnabled = fillToggle.checked;
   });
+  const opacityInput = $("strokeOpacity");
+  const opacityValue = $("strokeOpacityValue");
+  if (opacityInput) {
+    opacityInput.addEventListener("input", () => {
+      state.opacity = parseFloat(opacityInput.value);
+      opacityValue.textContent = String(Math.round(state.opacity * 100)) + "%";
+    });
+  }
   canvas.addEventListener("mousedown", onPointerDown);
   canvas.addEventListener("mousemove", onPointerMove);
   canvas.addEventListener("mouseup", onPointerUp);
