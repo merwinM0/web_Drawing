@@ -1,6 +1,6 @@
 # 🎨 SVG 绘图工具
 
-一个基于 **纯 SVG**（不使用 HTML Canvas）的矢量绘图 Web 应用。用 TypeScript 编写，支持绘画、形状、橡皮擦、撤销/重做、裁剪导出等功能。
+一个基于 **纯 SVG**（不使用 HTML Canvas）的矢量绘图 Web 应用。用 TypeScript 编写，支持绘画、多种画笔样式、形状工具、橡皮擦、不透明度控制、撤销/重做、导出等功能。
 
 ---
 
@@ -58,18 +58,46 @@ HTML (index.html) → CSS (style.css) → TS/JS (app.ts → app.js)
 - **mousemove**: 将每个采样点加入路径数组，使用 **二次贝塞尔插值（Quadratic Bezier）** 在相邻点的中点间生成平滑曲线
 - **mouseup**: 完成路径，保存历史快照
 - 路径表达式示例: `M x0,y0 Q x1,y1 (x1+x2)/2,(y1+y2)/2 Q x2,y2 ...`
+- 支持所有画笔样式（实线、虚线、点线、点划线、马克笔、双线笔）
 
 #### 📏 直线 / 矩形 / 椭圆
 - **mousedown**: 记录起始点，在 `previewLayer` 创建临时元素
 - **mousemove**: 实时更新临时元素的坐标/尺寸，实现拖拽预览
-- **Shift 约束**: 按 Shift 时计算拖拽方向角度，**四舍五入到 45° 的倍数**，实现水平/垂直/45° 直线、正方形、正圆
+- **Shift 约束**:
+  - 直线: **四舍五入到 45° 的倍数**，实现水平/垂直/45° 直线
+  - 矩形: 强制正方形（宽高相等）
+  - 椭圆: 强制正圆（`rx === ry`，取最大值）
 - **mouseup**: 将预览元素移动到 `drawingLayer`，清空预览层
 
 #### 🧽 橡皮擦
 - 原理：绘制**白色**（`#ffffff`）的粗路径，视觉上覆盖已有内容
 - 自动将最小笔触宽度设为 10px，确保擦除效果明显
 
-### 3. 撤销 / 重做 (Undo / Redo)
+### 3. 画笔样式系统
+
+| 样式 | 描述 | SVG 实现 |
+|---|---|---|
+| 实线 (solid) | 默认实线 | `stroke-dasharray: 无` |
+| 虚线 (dashed) | 标准虚线 | `stroke-dasharray: 8,5` |
+| 点线 (dotted) | 均匀点状 | `stroke-dasharray: 2,4` |
+| 点划线 (dashdot) | 线-点交替 | `stroke-dasharray: 8,5,2,5` |
+| 🆕 马克笔 (marker) | 半透明粗线效果 | 自动限制 `stroke-opacity ≤ 0.5` |
+| 🆕 双线笔 (double) | 外粗内细双线 | 主路径 + 伴生内层路径，`stroke-opacity: 0.5` |
+
+#### 不透明度控制
+- 工具栏提供 **透明滑块**（0.1 ~ 1.0）
+- 实时应用到所有工具的 `stroke-opacity`
+- 马克笔模式自动叠加半透明限制
+
+### 4. 坐标系统
+
+- 使用 **`createSVGPoint()` + `getScreenCTM()`** 原生 SVG API 进行坐标转换
+- 鼠标的 `clientX/clientY` → SVG 视图坐标系
+- 正确处理 CSS 缩放、`preserveAspectRatio` 留白、容器边框等场景
+- 实时在状态栏显示鼠标位置（SVG 坐标系）
+- 元素计数遍历 `drawingLayer` 子节点，排除背景矩形
+
+### 5. 撤销 / 重做 (Undo / Redo)
 
 - 每个操作完成后，**序列化 `drawingLayer.innerHTML`** 作为历史快照存入数组
 - 撤销：`historyIndex--`，用对应快照的 HTML 覆盖 `drawingLayer`
@@ -77,16 +105,15 @@ HTML (index.html) → CSS (style.css) → TS/JS (app.ts → app.js)
 - 最多保留 **100 步** 历史
 - 快捷键: `Ctrl+Z` 撤销，`Ctrl+Shift+Z` 重做
 
-### 4. 导出功能
+### 6. 导出功能
 
 #### SVG 导出
 1. 克隆当前 `<svg>` 节点（避免干扰实时画布）
 2. 移除 `#previewLayer` 内容
 3. 根据用户选择**决定是否包含背景** `<rect>`
-4. 根据用户输入的裁剪参数**修改 viewBox** 和 width/height
-5. 使用 `XMLSerializer` 序列化为 XML 字符串
-6. 添加 `<?xml?>` 声明头
-7. 通过 `Blob` + `URL.createObjectURL` 触发下载
+4. 使用 `XMLSerializer` 序列化为 XML 字符串
+5. 添加 `<?xml?>` 声明头
+6. 通过 `Blob` + `URL.createObjectURL` 触发下载
 
 #### PNG 导出
 1. 按相同方式构建 SVG 克隆
@@ -95,19 +122,6 @@ HTML (index.html) → CSS (style.css) → TS/JS (app.ts → app.js)
 4. 渲染到 `<canvas>` 上
 5. 用 `canvas.toBlob()` 输出 PNG 文件
 
-### 5. 裁剪导出
-
-- 在导出弹窗中，用户可设置 **viewBox 的 x, y, width, height**
-- **锁定宽高比**: 修改宽度时按原始比例自动计算高度，反之亦然
-- **画布预览**: 勾选后会在画布上显示一个蓝色虚线矩形，标明裁剪范围
-- 重置按钮一键恢复为全画布
-
-### 6. 坐标与元素计数
-
-- 鼠标移动时通过 `getBoundingClientRect()` + viewBox 比例换算得到 SVG 坐标系下的坐标
-- 实时在状态栏显示鼠标位置
-- 元素计数遍历 `drawingLayer` 子节点，排除背景矩形
-
 ---
 
 ## 🎮 操作流程
@@ -115,9 +129,9 @@ HTML (index.html) → CSS (style.css) → TS/JS (app.ts → app.js)
 ### 基本绘画
 
 ```
-1. 选择工具 ──→ 2. 调颜色/粗细 ──→ 3. 在画布上拖拽 ──→ 4. 完成
-                                                    ↓
-                                          自动保存到历史 (可撤销)
+1. 选择工具 ──→ 2. 调颜色/粗细/透明度 ──→ 3. 选画笔样式 ──→ 4. 在画布上拖拽 ──→ 5. 完成
+                                                                              ↓
+                                                                    自动保存到历史 (可撤销)
 ```
 
 ### 各工具操作
@@ -137,9 +151,6 @@ HTML (index.html) → CSS (style.css) → TS/JS (app.ts → app.js)
        ↓
   弹出导出设置弹窗
   ├── ☑ 包含白色背景
-  ├── 裁剪区域: X, Y, 宽度, 高度
-  │   ├── ☐ 锁定宽高比
-  │   └── ☐ 在画布上显示裁剪区域
   └── [导出 PNG] 或 [导出 SVG]
        ↓
   下载 drawing-时间戳.svg / .png
@@ -181,6 +192,7 @@ svg_draw/
 | API | 兼容性 |
 |---|---|
 | SVG DOM | ✅ 所有浏览器 |
+| SVG `createSVGPoint` + `getScreenCTM` | ✅ 所有浏览器 |
 | XMLSerializer | ✅ 所有浏览器 |
 | Blob / URL.createObjectURL | ✅ 所有浏览器 |
 | Canvas (PNG 导出) | ✅ 所有浏览器 |

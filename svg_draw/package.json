@@ -6,6 +6,7 @@
     "build": "bun build src/app.ts --outdir=src --target=browser",
     "watch": "bun build src/app.ts --outdir=src --target=browser --watch",
     "dev": "bun build src/app.ts --outdir=src --target=browser && npx serve src -p 3000 --no-clipboard --single",
+    "d":"bun run ./src/index.html",
     "start": "npx serve src -p 3000 --no-clipboard --single"
   },
   "devDependencies": {
