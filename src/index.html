@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f6f7fb" />
+  <title>区域画布工作台 · Web Drawing</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="module" src="./app.ts"></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="m5 3 15 10-8 1-4 7L5 3Z"/></symbol>
+    <symbol id="i-region" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 3h3m5 0h-2M3 11v2m18-2v2M11 21h2"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m4 15 9-10a2 2 0 0 1 2.9-.1l4 4a2 2 0 0 1 0 2.8L12 20H7l-3-3a1.5 1.5 0 0 1 0-2Z M10 10l6 6M12 20h9"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5m5 5H10a6 6 0 0 0 0 12h2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">▧</span><div><h1>web<span>Drawing</span></h1><p>区域式 SVG 设计工作台</p></div></div>
+      <span class="document-title">未命名画布 <span>/</span> 本地编辑</span>
+      <div class="top-actions">
+        <button id="undo" class="icon-btn" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销"><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
+        <button id="redo" class="icon-btn" type="button" title="重做 (Ctrl+Shift+Z)" aria-label="重做"><svg aria-hidden="true"><use href="#i-redo"/></svg></button>
+        <button id="export-json" class="secondary-btn" type="button" title="下载区域、笔画与绑定元数据">导出 JSON</button>
+        <button id="export-svg" class="icon-btn" type="button" title="导出 SVG 图片" aria-label="导出 SVG 图片"><svg aria-hidden="true"><use href="#i-download"/></svg></button>
+        <button id="export" class="primary-btn" type="button">导出网页</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside id="sidebar" class="sidebar" aria-label="区域图层面板">
+        <div class="sidebar-heading"><div class="sidebar-title"><span class="eyebrow">工作空间</span><h2>区域与图层</h2></div><button id="toggle-sidebar" class="icon-btn" type="button" title="收起侧边栏" aria-label="收起侧边栏" aria-expanded="true" aria-controls="sidebar-content"><svg aria-hidden="true"><use href="#i-panel"/></svg></button></div>
+        <div id="sidebar-content" class="sidebar-body">
+          <div class="section-heading"><span>上层在前</span><span id="layer-count" class="count-badge">00</span></div>
+          <p id="empty-layers" class="empty-layers">还没有区域。先在画布上拖出一个框，或用下方表单精确创建。</p>
+          <div id="layer-list" class="layer-list" role="group" aria-label="区域图层，上层在前"></div>
+          <div class="background-note"><svg aria-hidden="true"><use href="#i-layers"/></svg><span>底面背景 <small>锁定 · 不可绘画</small></span></div>
+
+          <section id="region-properties" class="properties hidden" aria-labelledby="properties-title">
+            <h3 id="properties-title">当前区域</h3>
+            <label for="region-name">区域名称</label><input id="region-name" type="text" maxlength="40" />
+            <p id="region-geometry"></p>
+            <div class="order-actions"><button id="layer-up" class="secondary-btn" type="button">上移一层</button><button id="layer-down" class="secondary-btn" type="button">下移一层</button></div>
+            <p class="binding-note">功能绑定：未绑定<br />后续功能将绑定到此区域 ID，而非某条笔画。</p>
+            <button id="delete-region" class="danger-btn" type="button">删除区域及其笔画</button>
+          </section>
+
+          <details id="precise-create" class="precise-create"><summary>精确创建区域</summary><form id="region-form">
+            <div class="field-grid"><label>X<input name="x" type="number" min="0" max="1188" value="60" required /></label><label>Y<input name="y" type="number" min="0" max="748" value="60" required /></label><label>宽度<input name="width" type="number" min="12" max="1200" value="300" required /></label><label>高度<input name="height" type="number" min="12" max="760" value="180" required /></label></div>
+            <button class="secondary-btn" type="submit">创建并选中</button><p id="form-error" class="form-error" role="alert"></p>
+          </form></details>
+          <p class="sidebar-tip">框可以重叠；笔画只属于当前区域。新建区域会放在最上层。</p>
+        </div>
+        <div class="sidebar-footer">未自动保存 · 离开前请导出</div>
+      </aside>
+
+      <main class="main-panel">
+        <div class="toolbar">
+          <div class="tool-group" role="group" aria-label="编辑工具">
+            <button class="tool-btn" type="button" data-tool="select" title="选择区域 (V)" aria-label="选择区域" aria-pressed="false"><svg aria-hidden="true"><use href="#i-select"/></svg><span>选择</span></button>
+            <button class="tool-btn active" type="button" data-tool="region" title="框选新区域 (R)" aria-label="框选新区域" aria-pressed="true"><svg aria-hidden="true"><use href="#i-region"/></svg><span>框选</span></button>
+            <button class="tool-btn" type="button" data-tool="pen" title="画笔 (P)" aria-label="画笔" aria-pressed="false"><svg aria-hidden="true"><use href="#i-pen"/></svg><span>画笔</span></button>
+            <button class="tool-btn" type="button" data-tool="eraser" title="橡皮擦 (E)" aria-label="橡皮擦" aria-pressed="false"><svg aria-hidden="true"><use href="#i-eraser"/></svg><span>橡皮</span></button>
+          </div>
+          <div class="tool-options"><label class="color-option">颜色<input id="stroke-color" type="color" value="#232c49" aria-label="画笔颜色" /></label><label class="size-option">粗细<input id="stroke-size" type="range" min="1" max="36" value="4" aria-label="笔刷粗细" /><output id="size-value" for="stroke-size">4</output></label></div>
+        </div>
+
+        <div class="canvas-area">
+          <div class="canvas-meta"><span>画布 01 <span class="canvas-subtitle">先框选，再绘画</span></span><span class="canvas-dimensions">1200 × 760 px</span></div>
+          <div class="artboard-wrap">
+            <svg id="artboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" aria-label="区域绘图画布" aria-describedby="canvas-help">
+              <rect width="1200" height="760" fill="#ffffff" />
+              <g id="region-layer"></g>
+              <g id="editor-overlay" aria-hidden="true" pointer-events="none"></g>
+            </svg>
+            <div id="canvas-empty" class="canvas-empty" aria-hidden="true"><strong>从一个框开始</strong><span>拖拽框选区域，然后在框内绘画</span></div>
+          </div>
+          <p id="canvas-help" class="canvas-help">R 框选 · V 选择 · P 画笔 · E 橡皮 · Esc 取消当前操作</p>
+          <p id="mode-hint" class="mode-hint" role="status" aria-live="polite">拖拽创建区域，完成后自动切换画笔。</p>
+        </div>
+        <footer class="statusbar"><span id="status-mode">框选新区域</span><span id="status-count">0 个区域 · 0 条笔画</span><span id="coordinates">X — · Y —</span></footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
