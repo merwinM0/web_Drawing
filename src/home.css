@@ -61,7 +61,7 @@ dialog::backdrop { background: #22283d59; }
 @media (max-width: 600px) {
   .home-topbar { padding: 16px; gap: 20px; min-height: 68px; }
   .home-brand { font-size: 16px; gap: 8px; }
-  .home-topbar .brand-mark { width: 28px; height: 32px; }
+  .home-topbar .brand-mark { --logo-size: 28px; }
   .local-badge { display: none; }
   .home-nav-current { margin-left: auto; font-size: 12px; }
   .home-main { padding: 32px 16px 24px; }

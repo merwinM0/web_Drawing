@@ -38,7 +38,7 @@ export class Editor {
   get pendingChanges(): boolean {
     const selected = this.store.selected;
     return !!selected && ($<HTMLInputElement>("region-name").value !== selected.name
-      || ["x", "y"].some(axis => Number($<HTMLInputElement>(`region-${axis}`).value) !== Math.round(selected.rect[axis as "x" | "y"] * 10) / 10));
+      || (["x", "y", "width", "height"] as const).some(axis => Number($<HTMLInputElement>(`region-${axis}`).value) !== Math.round(selected.rect[axis] * 10) / 10));
   }
   open(document: DrawingDocument, color: string): void {
     this.cancel(); this.store.load(document.regions); this.colors.set(color);
@@ -68,10 +68,10 @@ export class Editor {
     }
     const selected = this.store.selected;
     this.hint(this.tool === "region" ? "拖拽创建区域（至少 12 × 12 px），完成后自动切换画笔。"
-      : this.tool === "select" ? "拖动框移动整层；方向键微调，Shift + 方向键移动 10 px。重叠处优先选择最上层。"
+      : this.tool === "select" ? "拖动框移动；拖右侧、下侧或右下角调范围（不缩放笔画）。方向键微调位置。"
       : !selected ? "请先框选或选择已有区域。"
       : `当前：${selected.name} · ${this.tool === "pen" ? "只在此框内绘画，超出部分会裁剪。" : "只擦除此框已有笔画，不影响其他区域。"}`);
-    $("status-mode").textContent = this.tool === "region" ? "框选新区域" : this.tool === "select" ? "选择与移动" : `${selected?.name ?? "未选择区域"} · ${this.tool === "pen" ? "画笔" : "橡皮"}`;
+    $("status-mode").textContent = this.tool === "region" ? "框选新区域" : this.tool === "select" ? "选择 / 移动 / 调范围" : `${selected?.name ?? "未选择区域"} · ${this.tool === "pen" ? "画笔" : "橡皮"}`;
     $("status-count").textContent = `${this.store.state.regions.length} 个区域 · ${this.store.state.regions.reduce((sum, region) => sum + region.marks.filter(mark => mark.kind === "pen").length, 0)} 条笔画`;
     $<HTMLButtonElement>("undo").disabled = !this.store.canUndo;
     $<HTMLButtonElement>("redo").disabled = !this.store.canRedo;

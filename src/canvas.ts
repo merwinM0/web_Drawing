@@ -4,10 +4,11 @@ import { EditorStore, hitTest, type Mark, type Tool } from "./document";
 import { $ } from "./dom";
 import { containsPoint, HEIGHT, localPoint, movedRect, regionRect, WIDTH, type Point, type Rect } from "./geometry";
 import { renderOutlines, renderRegions } from "./render";
+import { hitResizeHandle, renderResizeHandles, resizeCursor, resizeFromDrag, type ResizeHandle } from "./region-resize";
 
 type Draft =
   | { tool: "region"; start: Point; end: Point; pointerId: number }
-  | { tool: "select"; start: Point; origin: Rect; rect: Rect; regionId: string; pointerId: number }
+  | { tool: "select"; start: Point; origin: Rect; rect: Rect; regionId: string; pointerId: number; handle?: ResizeHandle }
   | { tool: "pen" | "eraser"; regionId: string; rect: Rect; mark: Mark; pointerId: number };
 
 export class CanvasController {
@@ -28,6 +29,7 @@ export class CanvasController {
       if (!this.draft) $("coordinates").textContent = "X — · Y —";
     });
     window.addEventListener("blur", () => { this.cursor = null; this.cancel(); this.render(); });
+    new ResizeObserver(() => this.render()).observe(this.artboard);
   }
   cancel(): void {
     const id = this.draft?.pointerId;
@@ -40,13 +42,24 @@ export class CanvasController {
     const regions = draft?.tool === "select" ? this.store.state.regions.map(region => region.id === draft.regionId ? { ...region, rect: draft.rect } : region) : this.store.state.regions;
     const preview = draft && (draft.tool === "pen" || draft.tool === "eraser") ? { regionId: draft.regionId, mark: draft.mark } : undefined;
     $("region-layer").innerHTML = renderRegions(regions, preview);
-    $("editor-overlay").innerHTML = renderOutlines(regions, this.store.state.selectedRegionId, draft?.tool === "region" ? regionRect(draft.start, draft.end) ?? undefined : undefined);
+    const selected = regions.find(region => region.id === this.store.state.selectedRegionId);
+    const handles = this.tool() === "select" && selected ? renderResizeHandles(selected.rect, 8 / this.scale) : "";
+    $("editor-overlay").innerHTML = renderOutlines(regions, this.store.state.selectedRegionId, draft?.tool === "region" ? regionRect(draft.start, draft.end) ?? undefined : undefined) + handles;
     $("canvas-empty").classList.toggle("hidden", regions.length > 0 || !!draft);
-    this.artboard.style.cursor = this.tool() === "select" ? draft ? "grabbing" : "grab" : this.tool() === "region" ? "crosshair" : "none";
     this.renderCursor();
   }
+  private get scale(): number {
+    const matrix = this.artboard.getScreenCTM();
+    return matrix ? Math.hypot(matrix.a, matrix.b) || 1 : 1;
+  }
+  private handleAt(point: Point): ResizeHandle | undefined {
+    return this.store.selected ? hitResizeHandle(this.store.selected.rect, point, 12 / this.scale) : undefined;
+  }
   private renderCursor(): void {
-    const drawing = this.tool() === "pen" || this.tool() === "eraser";
+    const tool = this.tool(), draft = this.draft;
+    const handle = draft?.tool === "select" ? draft.handle : this.cursor ? this.handleAt(this.cursor) : undefined;
+    this.artboard.style.cursor = tool === "select" ? handle ? resizeCursor[handle] : draft ? "grabbing" : "grab" : tool === "region" ? "crosshair" : "none";
+    const drawing = tool === "pen" || tool === "eraser";
     const visible = drawing && this.cursor && containsPoint({ x: 0, y: 0, width: WIDTH, height: HEIGHT }, this.cursor);
     $("brush-cursor").innerHTML = visible ? this.brushes.cursor(this.cursor!, !!this.store.selected && containsPoint(this.store.selected.rect, this.cursor!)) : "";
   }
@@ -67,9 +80,10 @@ export class CanvasController {
     this.artboard.closest<HTMLElement>(".canvas-area")?.focus({ preventScroll: true });
     const start = this.point(event), tool = this.tool();
     if (tool === "select") {
-      const region = hitTest(this.store.state.regions, start);
+      const handle = this.handleAt(start);
+      const region = handle ? this.store.selected : hitTest(this.store.state.regions, start);
       this.store.select(region?.id ?? null);
-      if (region) this.draft = { tool, start, origin: region.rect, rect: region.rect, regionId: region.id, pointerId: event.pointerId };
+      if (region) this.draft = { tool, start, origin: region.rect, rect: region.rect, regionId: region.id, pointerId: event.pointerId, handle };
       else { this.refresh(); return; }
     } else if (tool === "region") this.draft = { tool, start, end: start, pointerId: event.pointerId };
     else {
@@ -102,7 +116,8 @@ export class CanvasController {
   }
   private dragged(draft: Extract<Draft, { tool: "select" }>, point: Point): Rect {
     if (Math.hypot(point.x - draft.start.x, point.y - draft.start.y) < 2) return draft.origin;
-    return movedRect(draft.origin, { x: draft.origin.x + point.x - draft.start.x, y: draft.origin.y + point.y - draft.start.y });
+    return draft.handle ? resizeFromDrag(draft.origin, draft.start, point, draft.handle)
+      : movedRect(draft.origin, { x: draft.origin.x + point.x - draft.start.x, y: draft.origin.y + point.y - draft.start.y });
   }
   private up(event: PointerEvent): void {
     const draft = this.draft;
@@ -114,7 +129,11 @@ export class CanvasController {
       if (rect) this.create(rect);
       else { this.refresh(); this.hint("请拖出至少 12 × 12 px 的框。"); }
     } else {
-      if (draft.tool === "select") this.store.move(draft.regionId, this.dragged(draft, end));
+      if (draft.tool === "select") {
+        const rect = this.dragged(draft, end);
+        if (draft.handle) this.store.resize(draft.regionId, rect);
+        else this.store.move(draft.regionId, rect);
+      }
       else { this.sample(draft.mark, draft.rect, event, true); this.store.appendMark(draft.regionId, draft.mark); }
       this.refresh();
     }

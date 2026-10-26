@@ -49,6 +49,15 @@ export function movedRect(rect: Rect, position: Point): Rect {
   };
 }
 
+/** Keep the origin and ink coordinates fixed; only change the clipping window. */
+export function resizedRect(rect: Rect, size: Pick<Rect, "width" | "height">): Rect {
+  return {
+    ...rect,
+    width: Math.max(MIN_REGION_SIZE, Math.min(WIDTH - rect.x, size.width)),
+    height: Math.max(MIN_REGION_SIZE, Math.min(HEIGHT - rect.y, size.height)),
+  };
+}
+
 export function pathData(points: Point[]): string {
   if (points.length === 0) return "";
   const coords = (point: Point) => `${point.x.toFixed(1)} ${point.y.toFixed(1)}`;

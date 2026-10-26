@@ -19,6 +19,12 @@ export class RegionPanel {
         onEdit();
       });
     }
+    for (const axis of ["width", "height"] as const) {
+      $<HTMLInputElement>(`region-${axis}`).addEventListener("change", event => {
+        if (store.selected) store.resize(store.selected.id, { ...store.selected.rect, [axis]: Number((event.target as HTMLInputElement).value) });
+        onEdit();
+      });
+    }
     $("layer-up").addEventListener("click", () => { store.reorder(1); onEdit(); });
     $("layer-down").addEventListener("click", () => { store.reorder(-1); onEdit(); });
     $("delete-region").addEventListener("click", () => {
@@ -88,8 +94,8 @@ export class RegionPanel {
     if (!selected) return;
     $<HTMLInputElement>("region-name").value = selected.name;
     const { x, y, width, height } = selected.rect;
-    $("region-geometry").textContent = `${Math.round(width)} × ${Math.round(height)} px · V 拖动，方向键微调`;
-    for (const [axis, value, max] of [["x", x, 1200 - width], ["y", y, 760 - height]] as const) {
+    $("region-geometry").textContent = `${Math.round(width)} × ${Math.round(height)} px · V 拖动或调整范围`;
+    for (const [axis, value, max] of [["x", x, 1200 - width], ["y", y, 760 - height], ["width", width, 1200 - x], ["height", height, 760 - y]] as const) {
       const input = $<HTMLInputElement>(`region-${axis}`);
       input.value = String(Math.round(value * 10) / 10); input.max = String(max);
     }

@@ -26,7 +26,7 @@
   </svg>
 
   <div id="home-page" class="home-page">
-    <header class="home-topbar"><a class="home-brand" href="#/" aria-label="Web Drawing 首页"><span class="brand-mark" aria-hidden="true">▧</span><strong>web<span>Drawing</span></strong></a><span class="home-nav-current">绘画库</span><span class="local-badge">本地工作空间</span></header>
+    <header class="home-topbar"><a class="home-brand" href="#/" aria-label="Web Drawing 首页"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><strong>web<span>Drawing</span></strong></a><span class="home-nav-current">绘画库</span><span class="local-badge">本地工作空间</span></header>
     <main class="home-main">
       <div class="library-heading"><div><p class="eyebrow">YOUR CREATIVE SPACE</p><h1 id="home-heading" tabindex="-1">我的绘画</h1><p class="library-description">从一个框开始，把灵感画成自己的样子。</p></div><button id="new-drawing" class="primary-btn new-btn" type="button"><span aria-hidden="true">＋</span>新建绘画</button></div>
       <div class="library-toolbar"><div><strong>最近保存</strong><span id="drawing-total">0 份绘画</span></div><label class="search-field"><span class="sr-only">搜索绘画</span><input id="drawing-search" type="search" placeholder="搜索绘画名称…" /></label></div>
@@ -43,7 +43,7 @@
   <div id="workbench" class="app-shell hidden">
     <header class="topbar">
       <button id="go-home" class="icon-btn" type="button" title="返回绘画库" aria-label="返回首页"><svg aria-hidden="true"><use href="#i-home"/></svg></button>
-      <div class="brand work-brand"><span class="brand-mark" aria-hidden="true">▧</span><div><strong class="work-wordmark">web<span>Drawing</span></strong><p>区域式 SVG 设计工作台</p></div></div>
+      <div class="brand work-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><div><strong class="work-wordmark">web<span>Drawing</span></strong><p>区域式 SVG 设计工作台</p></div></div>
       <div class="document-meta"><label class="sr-only" for="drawing-title">绘画名称</label><input id="drawing-title" type="text" maxlength="80" value="未命名绘画" /><span id="save-status" role="status" aria-live="polite">已保存到此浏览器</span></div>
       <nav class="top-actions" aria-label="工作台操作">
         <button id="undo" class="icon-btn" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销"><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
@@ -66,7 +66,8 @@
             <h3 id="properties-title">当前区域</h3>
             <label for="region-name">区域名称</label><input id="region-name" type="text" maxlength="40" />
             <p id="region-geometry"></p>
-            <div class="field-grid position-fields"><label for="region-x">区域 X<input id="region-x" type="number" min="0" step="0.1" /></label><label for="region-y">区域 Y<input id="region-y" type="number" min="0" step="0.1" /></label></div>
+            <div class="field-grid position-fields"><label for="region-x">区域 X<input id="region-x" type="number" min="0" step="0.1" /></label><label for="region-y">区域 Y<input id="region-y" type="number" min="0" step="0.1" /></label><label for="region-width">范围宽度<input id="region-width" type="number" min="12" step="0.1" aria-describedby="resize-help" /></label><label for="region-height">范围高度<input id="region-height" type="number" min="12" step="0.1" aria-describedby="resize-help" /></label></div>
+            <p id="resize-help">宽高只改变可绘画范围，不缩放内部内容。缩小时隐藏的笔画会保留，扩大后可再次显示。</p>
             <div class="order-actions"><button id="layer-up" class="secondary-btn" type="button">上移一层</button><button id="layer-down" class="secondary-btn" type="button">下移一层</button></div>
             <p class="binding-note">功能绑定：未绑定<br />后续功能将绑定到此区域 ID，而非某条笔画。</p>
             <button id="delete-region" class="danger-btn" type="button">删除区域及其笔画</button>

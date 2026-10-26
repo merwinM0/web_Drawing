@@ -5,6 +5,7 @@ import type { DrawingDocument, Mark, Region } from "../src/document";
 import { renderSVG } from "../src/render";
 import { checkBrushes } from "./brush-browser";
 import { checkLibrary } from "./library-browser";
+import { checkResize } from "./resize-browser";
 
 const probe = Bun.serve({ port: 0, fetch: () => new Response() });
 const port = probe.port!;
@@ -201,6 +202,7 @@ try {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/${width}.png`, fullPage: true });
   }
   await checkLibrary(browser, url, { point, drag, drawing, download });
+  await checkResize(browser, url, { point, drag, drawing, download });
   assert.deepEqual(errors, [], "浏览器不应有运行错误");
   console.log("通过：320 / 768 / 1024 / 1440 响应式布局、小屏精确创建与 axe WCAG 2.1 AA 检查");
 } finally {

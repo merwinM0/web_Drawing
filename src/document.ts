@@ -1,5 +1,5 @@
 import { validStrokeSettings, type Stroke } from "./brushes";
-import { containsPoint, movedRect, validRect, type Point, type Rect } from "./geometry";
+import { containsPoint, movedRect, resizedRect, validRect, type Point, type Rect } from "./geometry";
 
 export type Tool = "select" | "region" | "pen" | "eraser";
 export type Mark = Stroke;
@@ -87,6 +87,14 @@ export class EditorStore {
     return this.commit(state => {
       const region = state.regions.find(item => item.id === id);
       if (region) region.rect = movedRect(region.rect, position);
+    });
+  }
+
+  resize(id: string, size: Pick<Rect, "width" | "height">): boolean {
+    if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) return false;
+    return this.commit(state => {
+      const region = state.regions.find(item => item.id === id);
+      if (region) region.rect = resizedRect(region.rect, size);
     });
   }
 
