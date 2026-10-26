@@ -41,7 +41,7 @@ type RegionBinding = {
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "width": 1200,
   "height": 760,
   "regions": [
@@ -56,7 +56,7 @@ type RegionBinding = {
 }
 ```
 
-数组从底到顶排列。笔画点是相对 `rect.x/y` 的局部坐标，可能包含越界采样，显示时必须保留区域裁剪。完整笔画结构见[架构文档](ARCHITECTURE.md)。
+数组从底到顶排列。版本 2 在笔画中增加可选预设、透明度、平滑度、压力模式，以及采样点压力，不改变区域 ID 和绑定契约。笔画点是相对 `rect.x/y` 的局部坐标，可能包含越界采样，显示时必须保留区域裁剪。完整笔画结构见[架构文档](ARCHITECTURE.md)。
 
 ## 导出 HTML 的运行时接口
 
