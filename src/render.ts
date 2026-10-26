@@ -1,16 +1,10 @@
+import { renderStroke } from "./brush-render";
 import type { Mark, Region } from "./document";
-import { HEIGHT, pathData, WIDTH, type Rect } from "./geometry";
+import { HEIGHT, WIDTH, type Rect } from "./geometry";
+import { escapeXML } from "./xml";
 
 export const SVG_NS = "http://www.w3.org/2000/svg";
 export type MarkPreview = { regionId: string; mark: Mark };
-
-export function escapeXML(value: string): string {
-  return value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!);
-}
-
-function path(mark: Mark, color = mark.color): string {
-  return `<path d="${pathData(mark.points)}" fill="none" stroke="${escapeXML(color)}" stroke-width="${mark.width}" stroke-linecap="round" stroke-linejoin="round"/>`;
-}
 
 /** Both editing and export use the same clipping and chronological erasing. */
 export function renderRegions(regions: Region[], preview?: MarkPreview, interactive = false): string {
@@ -23,10 +17,12 @@ export function renderRegions(regions: Region[], preview?: MarkPreview, interact
     const marks = preview?.regionId === region.id ? [...region.marks, preview.mark] : region.marks;
     let ink = "";
     marks.forEach((mark, index) => {
-      if (mark.kind === "pen") ink += path(mark);
+      const stroke = renderStroke(mark, `${region.id}-${index}`, region.rect);
+      definitions.push(stroke.definitions);
+      if (mark.kind === "pen") ink += stroke.content;
       else if (ink) {
         const maskId = `region-erase-${id}-${index}`;
-        definitions.push(`<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" style="mask-type:luminance"><rect width="${width}" height="${height}" fill="white"/>${path(mark, "black")}</mask>`);
+        definitions.push(`<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" style="mask-type:luminance"><rect width="${width}" height="${height}" fill="white"/>${stroke.content}</mask>`);
         // Only earlier ink in this region is erased; later strokes remain intact.
         ink = `<g mask="url(#${maskId})">${ink}</g>`;
       }

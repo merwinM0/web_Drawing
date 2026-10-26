@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium, type Page } from "playwright";
 import type { DrawingDocument, Mark, Region } from "../src/document";
 import { renderSVG } from "../src/render";
+import { checkBrushes } from "./brush-browser";
 
 const probe = Bun.serve({ port: 0, fetch: () => new Response() });
 const port = probe.port!;
@@ -163,6 +164,8 @@ try {
   assert.deepEqual(pixels, [[255, 255, 255, 255], [255, 0, 0, 255], [255, 0, 0, 255], [0, 0, 255, 255], [255, 255, 255, 255], [0, 255, 0, 255], [255, 255, 255, 255]]);
   console.log("通过：真实像素验证裁剪、透明橡皮、下层显露、后画笔画和图层叠加");
 
+  await checkBrushes(page, { point, drag, drawing, download });
+
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.reload();
@@ -182,6 +185,11 @@ try {
       assert.equal((await drawing(page)).regions.length, 1, "小屏可用表单创建区域");
       await page.getByRole("button", { name: "收起侧边栏", exact: true }).click();
     }
+    if (width !== 320) {
+      await drag(page, [100, 100], [700, 450]);
+    }
+    await page.getByRole("button", { name: "画笔", exact: true }).click();
+    await page.locator("#pen-preset").selectOption("ink");
     const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
     assert.deepEqual(accessibility.violations.map(issue => ({ id: issue.id, targets: issue.nodes.map(node => node.target) })), [], `${width}px 存在无障碍问题`);
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/${width}.png`, fullPage: true });

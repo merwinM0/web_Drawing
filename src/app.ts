@@ -1,7 +1,9 @@
+import { BrushPanel } from "./brush-panel";
+import { samplePoint } from "./brushes";
 import { EditorStore, hitTest, type Mark, type Tool } from "./document";
 import { $ } from "./dom";
 import { download, exportDocument, renderHTML } from "./export";
-import { containsPoint, localPoint, regionRect, type Point, type Rect } from "./geometry";
+import { containsPoint, HEIGHT, localPoint, regionRect, WIDTH, type Point, type Rect } from "./geometry";
 import { renderOutlines, renderRegions, renderSVG } from "./render";
 import { RegionPanel } from "./sidebar";
 
@@ -10,11 +12,11 @@ type Draft =
   | { tool: "pen" | "eraser"; regionId: string; rect: Rect; mark: Mark; pointerId: number };
 const store = new EditorStore();
 const artboard = $<SVGSVGElement>("artboard");
-const colorInput = $<HTMLInputElement>("stroke-color");
-const sizeInput = $<HTMLInputElement>("stroke-size");
 let tool: Tool = "region";
 let draft: Draft | null = null;
+let cursorPoint: Point | null = null;
 let frame = 0;
+const brushes = new BrushPanel(() => { cancelDraft(); renderUI(); });
 const panel = new RegionPanel(store, () => { cancelDraft(); renderUI(); }, id => {
   cancelDraft();
   store.select(id);
@@ -29,6 +31,15 @@ function getPoint(event: PointerEvent): Point {
   const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
   return { x: point.x, y: point.y };
 }
+function appendSample(mark: Mark, rect: Rect, event: PointerEvent, released = false): void {
+  const point = samplePoint(localPoint(rect, getPoint(event)), event.pressure, event.pointerType, mark.points.at(-1), released);
+  const last = mark.points.at(-1);
+  if (!last || point.x !== last.x || point.y !== last.y || point.pressure !== last.pressure) mark.points.push(point);
+}
+function renderCursor(): void {
+  const visible = cursorPoint && (tool === "pen" || tool === "eraser") && containsPoint({ x: 0, y: 0, width: WIDTH, height: HEIGHT }, cursorPoint);
+  $("brush-cursor").innerHTML = visible ? brushes.cursor(cursorPoint!, !!store.selected && containsPoint(store.selected.rect, cursorPoint!)) : "";
+}
 function cancelDraft(): void {
   const pointerId = draft?.pointerId;
   draft = null;
@@ -42,8 +53,10 @@ function renderCanvas(): void {
   const rect = draft?.tool === "region" ? regionRect(draft.start, draft.end) ?? undefined : undefined;
   $("editor-overlay").innerHTML = renderOutlines(store.state.regions, store.state.selectedRegionId, rect);
   $("canvas-empty").classList.toggle("hidden", store.state.regions.length > 0 || draft !== null);
+  renderCursor();
 }
 function renderUI(): void {
+  brushes.render(tool);
   renderCanvas();
   panel.render();
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-tool]")) {
@@ -51,7 +64,7 @@ function renderUI(): void {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  artboard.style.cursor = tool === "select" ? "default" : "crosshair";
+  artboard.style.cursor = tool === "select" ? "default" : tool === "region" ? "crosshair" : "none";
   const selected = store.selected;
   hint(tool === "region" ? "拖拽创建区域（至少 12 × 12 px），完成后自动切换画笔。"
     : tool === "select" ? "点击选择最上层区域；重叠处的下层区域请从左侧图层列表选择。"
@@ -78,6 +91,7 @@ function travelHistory(redo = false): void {
 artboard.addEventListener("pointerdown", event => {
   if (event.button !== 0 || !event.isPrimary || draft) return;
   event.preventDefault();
+  artboard.closest<HTMLElement>(".canvas-area")?.focus({ preventScroll: true });
   const start = getPoint(event);
   if (tool === "select") {
     store.select(hitTest(store.state.regions, start)?.id ?? null);
@@ -91,20 +105,26 @@ artboard.addEventListener("pointerdown", event => {
       hint(selected ? "请从当前区域框内起笔；选择其他框请按 V 或点击左侧图层。" : "还没有选中区域，请按 R 框选后再绘画。");
       return;
     }
-    draft = { tool, regionId: selected.id, rect: selected.rect, pointerId: event.pointerId, mark: {
-      kind: tool, points: [localPoint(selected.rect, start)], color: colorInput.value,
-      width: tool === "eraser" ? Math.max(10, Number(sizeInput.value) * 2) : Number(sizeInput.value),
-    } };
+    const mark = brushes.createMark(tool, event.pointerType);
+    appendSample(mark, selected.rect, event);
+    draft = { tool, regionId: selected.id, rect: selected.rect, pointerId: event.pointerId, mark };
   }
+  cursorPoint = start;
   artboard.setPointerCapture(event.pointerId);
   renderCanvas();
 });
 artboard.addEventListener("pointermove", event => {
+  if (!event.isPrimary) return;
   const point = getPoint(event);
+  cursorPoint = point;
+  renderCursor();
   $("coordinates").textContent = `X ${Math.round(point.x)} · Y ${Math.round(point.y)}`;
   if (!draft || draft.pointerId !== event.pointerId) return;
   if (draft.tool === "region") draft.end = point;
-  else draft.mark.points.push(localPoint(draft.rect, point));
+  else {
+    const coalesced = event.getCoalescedEvents?.() ?? [];
+    for (const sample of coalesced.length ? coalesced : [event]) appendSample(draft.mark, draft.rect, sample);
+  }
   if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderCanvas(); });
 });
 artboard.addEventListener("pointerup", event => {
@@ -117,7 +137,7 @@ artboard.addEventListener("pointerup", event => {
     if (rect) createRegion(rect);
     else { renderUI(); hint("未创建区域：请拖出至少 12 × 12 px 的框。"); }
   } else {
-    finished.mark.points.push(localPoint(finished.rect, end));
+    appendSample(finished.mark, finished.rect, event, true);
     store.appendMark(finished.regionId, finished.mark);
     renderUI();
   }
@@ -127,14 +147,17 @@ for (const event of ["pointercancel", "lostpointercapture"] as const) {
     if (draft?.pointerId === pointer.pointerId) { cancelDraft(); renderCanvas(); }
   });
 }
-artboard.addEventListener("pointerleave", () => { if (!draft) $("coordinates").textContent = "X — · Y —"; });
-window.addEventListener("blur", () => { cancelDraft(); renderCanvas(); });
+artboard.addEventListener("pointerleave", () => {
+  cursorPoint = null;
+  renderCursor();
+  if (!draft) $("coordinates").textContent = "X — · Y —";
+});
+window.addEventListener("blur", () => { cursorPoint = null; cancelDraft(); renderCanvas(); });
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-tool]")) {
   button.addEventListener("click", () => setTool(button.dataset.tool as Tool));
 }
 $("undo").addEventListener("click", () => travelHistory());
 $("redo").addEventListener("click", () => travelHistory(true));
-sizeInput.addEventListener("input", () => { $("size-value").textContent = sizeInput.value; });
 $("export-svg").addEventListener("click", () => download(`<?xml version="1.0" encoding="UTF-8"?>\n${renderSVG(store.state.regions)}`, "web-drawing.svg", "image/svg+xml;charset=utf-8"));
 $("export-json").addEventListener("click", () => download(JSON.stringify(exportDocument(store.state.regions), null, 2), "web-drawing.json", "application/json;charset=utf-8"));
 $("export").addEventListener("click", () => download(renderHTML(store.state.regions), "web-drawing.html", "text/html;charset=utf-8"));

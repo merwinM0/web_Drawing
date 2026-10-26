@@ -44,7 +44,7 @@ test("临时笔画只用于预览，不进入文档或导出结果", () => {
 test("导出 HTML 保留区域数据、整个框的命中面和按区域激活的事件接口", () => {
   const store = fixture();
   const data = exportDocument(store.state.regions);
-  expect(data).toMatchObject({ version: 1, width: 1200, height: 760 });
+  expect(data).toMatchObject({ version: 2, width: 1200, height: 760 });
   data.regions[0]!.name = "外部修改";
   expect(store.state.regions[0]!.name).toBe("区域 1");
   const html = renderHTML(store.state.regions);

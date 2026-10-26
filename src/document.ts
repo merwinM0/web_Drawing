@@ -1,7 +1,8 @@
+import { validStrokeSettings, type Stroke } from "./brushes";
 import { containsPoint, validRect, type Point, type Rect } from "./geometry";
 
 export type Tool = "select" | "region" | "pen" | "eraser";
-export type Mark = { kind: "pen" | "eraser"; points: Point[]; width: number; color: string };
+export type Mark = Stroke;
 /** Reserved data contract. No business action is executed by the editor. */
 export type RegionBinding = { event: "activate"; action: string; payload: Record<string, unknown> };
 export type Region = {
@@ -12,7 +13,7 @@ export type Region = {
   binding: RegionBinding | null;
 };
 export type DocumentState = { regions: Region[]; selectedRegionId: string | null };
-export type DrawingDocument = { version: 1; width: 1200; height: 760; regions: Region[] };
+export type DrawingDocument = { version: 2; width: 1200; height: 760; regions: Region[] };
 
 /** The array is the single source of truth for stacking: bottom → top. */
 export function hitTest(regions: Region[], point: Point): Region | undefined {
@@ -64,7 +65,7 @@ export class EditorStore {
 
   appendMark(regionId: string, mark: Mark): boolean {
     const region = this.state.regions.find(item => item.id === regionId);
-    if (!region || !mark.points.length || !Number.isFinite(mark.width) || mark.width <= 0
+    if (!region || !validStrokeSettings(mark) || !mark.points.length || !Number.isFinite(mark.width) || mark.width <= 0
       || !mark.points.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))
       || !containsPoint({ x: 0, y: 0, width: region.rect.width, height: region.rect.height }, mark.points[0]!)) return false;
     return this.commit(state => {

@@ -3,7 +3,7 @@ import { HEIGHT, WIDTH } from "./geometry";
 import { renderSVG } from "./render";
 
 export function exportDocument(regions: Region[]): DrawingDocument {
-  return { version: 1, width: WIDTH, height: HEIGHT, regions: structuredClone(regions) };
+  return { version: 2, width: WIDTH, height: HEIGHT, regions: structuredClone(regions) };
 }
 
 /** Prevent user-controlled names/payloads from closing the JSON script element. */

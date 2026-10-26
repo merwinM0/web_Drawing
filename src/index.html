@@ -69,16 +69,28 @@
             <button class="tool-btn" type="button" data-tool="pen" title="画笔 (P)" aria-label="画笔" aria-pressed="false"><svg aria-hidden="true"><use href="#i-pen"/></svg><span>画笔</span></button>
             <button class="tool-btn" type="button" data-tool="eraser" title="橡皮擦 (E)" aria-label="橡皮擦" aria-pressed="false"><svg aria-hidden="true"><use href="#i-eraser"/></svg><span>橡皮</span></button>
           </div>
-          <div class="tool-options"><label class="color-option">颜色<input id="stroke-color" type="color" value="#232c49" aria-label="画笔颜色" /></label><label class="size-option">粗细<input id="stroke-size" type="range" min="1" max="36" value="4" aria-label="笔刷粗细" /><output id="size-value" for="stroke-size">4</output></label></div>
+          <div class="tool-options"><label class="color-option">颜色<input id="stroke-color" type="color" value="#232c49" aria-label="画笔颜色" /></label><label class="size-option">大小<input id="stroke-size" type="range" min="1" max="100" value="4" aria-label="笔刷大小" /><output id="size-value" for="stroke-size">4</output><span>px</span></label></div>
         </div>
+        <section id="brushbar" class="brushbar hidden" aria-label="笔刷设置">
+          <div class="brush-controls">
+            <label id="pen-preset-option">画笔<select id="pen-preset"><option value="round">圆头笔</option><option value="ink">压感墨笔</option><option value="pencil">纹理铅笔</option><option value="marker">荧光笔</option></select></label>
+            <label id="eraser-preset-option" class="hidden">橡皮<select id="eraser-preset"><option value="hard">硬边橡皮</option><option value="soft">柔边橡皮</option><option value="block">方形橡皮</option></select></label>
+            <label><span id="opacity-label">透明度</span><input id="stroke-opacity" type="range" min="5" max="100" value="100" aria-label="笔刷透明度或擦除强度" /><output id="opacity-value" for="stroke-opacity">100%</output></label>
+            <label>平滑度<input id="stroke-smoothing" type="range" min="0" max="100" value="40" aria-label="笔迹平滑度" /><output id="smoothing-value" for="stroke-smoothing">40%</output></label>
+            <label class="pressure-option"><input id="pressure-enabled" type="checkbox" />启用压感</label>
+            <svg id="brush-preview" viewBox="0 0 144 44" width="144" height="44" aria-hidden="true"><title>笔触形态预览，大小已缩放</title></svg>
+          </div>
+          <p id="brush-description" class="brush-description"></p>
+        </section>
 
-        <div class="canvas-area">
+        <div class="canvas-area" tabindex="0" role="region" aria-label="画布工作区，可用方向键滚动">
           <div class="canvas-meta"><span>画布 01 <span class="canvas-subtitle">先框选，再绘画</span></span><span class="canvas-dimensions">1200 × 760 px</span></div>
           <div class="artboard-wrap">
             <svg id="artboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" aria-label="区域绘图画布" aria-describedby="canvas-help">
               <rect width="1200" height="760" fill="#ffffff" />
               <g id="region-layer"></g>
               <g id="editor-overlay" aria-hidden="true" pointer-events="none"></g>
+              <g id="brush-cursor" aria-hidden="true" pointer-events="none"></g>
             </svg>
             <div id="canvas-empty" class="canvas-empty" aria-hidden="true"><strong>从一个框开始</strong><span>拖拽框选区域，然后在框内绘画</span></div>
           </div>
