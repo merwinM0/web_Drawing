@@ -9,7 +9,7 @@ export class BrushPanel {
   private kind: "pen" | "eraser" = "pen";
   private selected: Record<"pen" | "eraser", PresetId> = { pen: "round", eraser: "hard" };
   private settings = new Map<PresetId, BrushSettings>();
-  constructor(onChange: () => void) {
+  constructor(onChange: () => void, private getColor: () => string) {
     for (const kind of ["pen", "eraser"] as const) {
       $<HTMLSelectElement>(`${kind}-preset`).addEventListener("change", event => {
         this.selected[kind] = (event.target as HTMLSelectElement).value as PresetId;
@@ -26,7 +26,6 @@ export class BrushPanel {
       this.current.pressure = (event.target as HTMLInputElement).checked;
       onChange();
     });
-    $("stroke-color").addEventListener("input", onChange);
   }
   private get current(): BrushSettings {
     const id = this.selected[this.kind];
@@ -37,7 +36,7 @@ export class BrushPanel {
     this.kind = kind;
     const settings = this.current;
     return {
-      kind, brush: settings.brush, points: [], color: $<HTMLInputElement>("stroke-color").value,
+      kind, brush: settings.brush, points: [], color: this.getColor(),
       width: settings.width, opacity: settings.opacity, smoothing: settings.smoothing,
       pressureMode: pressureMode(preset(settings.brush).pressure && settings.pressure, pointerType),
     };
@@ -46,7 +45,6 @@ export class BrushPanel {
     const active = tool === "pen" || tool === "eraser";
     if (active) this.kind = tool;
     $("brushbar").classList.toggle("hidden", !active);
-    $<HTMLInputElement>("stroke-color").disabled = tool !== "pen";
     const size = $<HTMLInputElement>("stroke-size");
     size.disabled = !active;
     size.max = this.kind === "pen" ? "100" : "160";

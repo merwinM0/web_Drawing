@@ -1,5 +1,5 @@
 import { validStrokeSettings, type Stroke } from "./brushes";
-import { containsPoint, validRect, type Point, type Rect } from "./geometry";
+import { containsPoint, movedRect, validRect, type Point, type Rect } from "./geometry";
 
 export type Tool = "select" | "region" | "pen" | "eraser";
 export type Mark = Stroke;
@@ -28,6 +28,14 @@ export class EditorStore {
   private history: DocumentState[] = [structuredClone(this.state)];
   private index = 0;
 
+  constructor(private onChange: () => void = () => {}) {}
+
+  load(regions: Region[]): void {
+    this.state = { regions: structuredClone(regions), selectedRegionId: regions.at(-1)?.id ?? null };
+    this.history = [structuredClone(this.state)];
+    this.index = 0;
+  }
+
   get selected(): Region | undefined {
     return this.state.regions.find(region => region.id === this.state.selectedRegionId);
   }
@@ -50,6 +58,7 @@ export class EditorStore {
     this.history.push(structuredClone(next));
     if (this.history.length > 80) this.history.shift();
     this.index = this.history.length - 1;
+    this.onChange();
     return true;
   }
 
@@ -70,6 +79,14 @@ export class EditorStore {
       || !containsPoint({ x: 0, y: 0, width: region.rect.width, height: region.rect.height }, mark.points[0]!)) return false;
     return this.commit(state => {
       state.regions.find(region => region.id === regionId)?.marks.push(structuredClone(mark));
+    });
+  }
+
+  move(id: string, position: Point): boolean {
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
+    return this.commit(state => {
+      const region = state.regions.find(item => item.id === id);
+      if (region) region.rect = movedRect(region.rect, position);
     });
   }
 
@@ -105,5 +122,6 @@ export class EditorStore {
   private restore(index: number): void {
     this.index = index;
     this.state = structuredClone(this.history[index]!);
+    this.onChange();
   }
 }

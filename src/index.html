@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#f6f7fb" />
   <title>区域画布工作台 · Web Drawing</title>
   <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./home.css" />
+  <link rel="stylesheet" href="./color-wheel.css" />
   <script type="module" src="./app.ts"></script>
 </head>
 <body>
@@ -19,19 +21,36 @@
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></symbol>
     <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5m5 5H10a6 6 0 0 0 0 12h2"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M5 9v12h14V9M10 21v-7h4v7"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h9V3M7 21v-8h10v8"/></symbol>
   </svg>
 
-  <div class="app-shell">
+  <div id="home-page" class="home-page">
+    <header class="home-topbar"><a class="home-brand" href="#/" aria-label="Web Drawing 首页"><span class="brand-mark" aria-hidden="true">▧</span><strong>web<span>Drawing</span></strong></a><span class="home-nav-current">绘画库</span><span class="local-badge">本地工作空间</span></header>
+    <main class="home-main">
+      <div class="library-heading"><div><p class="eyebrow">YOUR CREATIVE SPACE</p><h1 id="home-heading" tabindex="-1">我的绘画</h1><p class="library-description">从一个框开始，把灵感画成自己的样子。</p></div><button id="new-drawing" class="primary-btn new-btn" type="button"><span aria-hidden="true">＋</span>新建绘画</button></div>
+      <div class="library-toolbar"><div><strong>最近保存</strong><span id="drawing-total">0 份绘画</span></div><label class="search-field"><span class="sr-only">搜索绘画</span><input id="drawing-search" type="search" placeholder="搜索绘画名称…" /></label></div>
+      <p id="home-loading" class="loading-message" role="status">正在读取绘画库…</p>
+      <div id="home-error" class="home-error hidden" role="alert"><span id="home-error-text"></span><button id="home-retry" type="button" class="secondary-btn">重试</button></div>
+      <p id="home-warning" class="home-warning" role="status"></p>
+      <div id="drawing-list" class="drawing-list" aria-label="已保存的绘画" aria-busy="true"></div>
+      <section id="home-empty" class="home-empty hidden" aria-label="空绘画库"><div class="empty-art" aria-hidden="true"><span></span><span></span><i></i></div><h2>第一张画，从这里开始</h2><p>新建一张画布，框选区域，再选择喜欢的笔触。</p><button id="new-empty" type="button" class="secondary-btn">创建第一份绘画</button></section>
+      <p id="search-empty" class="search-empty hidden">没有找到匹配的绘画，试试其他名称。</p>
+      <footer class="library-footer"><span>1200 × 760 · SVG 绘画工作台</span><span>作品保存在此浏览器。清除网站数据会删除本地作品，请定期导出备份。</span></footer>
+    </main>
+  </div>
+
+  <div id="workbench" class="app-shell hidden">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">▧</span><div><h1>web<span>Drawing</span></h1><p>区域式 SVG 设计工作台</p></div></div>
-      <span class="document-title">未命名画布 <span>/</span> 本地编辑</span>
-      <div class="top-actions">
+      <button id="go-home" class="icon-btn" type="button" title="返回绘画库" aria-label="返回首页"><svg aria-hidden="true"><use href="#i-home"/></svg></button>
+      <div class="brand work-brand"><span class="brand-mark" aria-hidden="true">▧</span><div><strong class="work-wordmark">web<span>Drawing</span></strong><p>区域式 SVG 设计工作台</p></div></div>
+      <div class="document-meta"><label class="sr-only" for="drawing-title">绘画名称</label><input id="drawing-title" type="text" maxlength="80" value="未命名绘画" /><span id="save-status" role="status" aria-live="polite">已保存到此浏览器</span></div>
+      <nav class="top-actions" aria-label="工作台操作">
         <button id="undo" class="icon-btn" type="button" title="撤销 (Ctrl+Z)" aria-label="撤销"><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
         <button id="redo" class="icon-btn" type="button" title="重做 (Ctrl+Shift+Z)" aria-label="重做"><svg aria-hidden="true"><use href="#i-redo"/></svg></button>
-        <button id="export-json" class="secondary-btn" type="button" title="下载区域、笔画与绑定元数据">导出 JSON</button>
-        <button id="export-svg" class="icon-btn" type="button" title="导出 SVG 图片" aria-label="导出 SVG 图片"><svg aria-hidden="true"><use href="#i-download"/></svg></button>
-        <button id="export" class="primary-btn" type="button">导出网页</button>
-      </div>
+        <button id="save-drawing" class="primary-btn save-btn" type="button" title="保存当前绘画 (Ctrl/Cmd+S)"><svg aria-hidden="true"><use href="#i-save"/></svg><span id="save-label">保存</span></button>
+        <details id="export-menu" class="export-menu"><summary>导出 <span aria-hidden="true">⌄</span></summary><div class="export-popover"><button id="export" type="button">导出网页 HTML</button><button id="export-svg" type="button">导出 SVG 图片</button><button id="export-json" type="button">导出项目 JSON</button></div></details>
+      </nav>
     </header>
 
     <div class="workspace">
@@ -47,6 +66,7 @@
             <h3 id="properties-title">当前区域</h3>
             <label for="region-name">区域名称</label><input id="region-name" type="text" maxlength="40" />
             <p id="region-geometry"></p>
+            <div class="field-grid position-fields"><label for="region-x">区域 X<input id="region-x" type="number" min="0" step="0.1" /></label><label for="region-y">区域 Y<input id="region-y" type="number" min="0" step="0.1" /></label></div>
             <div class="order-actions"><button id="layer-up" class="secondary-btn" type="button">上移一层</button><button id="layer-down" class="secondary-btn" type="button">下移一层</button></div>
             <p class="binding-note">功能绑定：未绑定<br />后续功能将绑定到此区域 ID，而非某条笔画。</p>
             <button id="delete-region" class="danger-btn" type="button">删除区域及其笔画</button>
@@ -58,18 +78,19 @@
           </form></details>
           <p class="sidebar-tip">框可以重叠；笔画只属于当前区域。新建区域会放在最上层。</p>
         </div>
-        <div class="sidebar-footer">未自动保存 · 离开前请导出</div>
+        <div class="sidebar-footer">本地绘画库 · 顶部保存后保留修改</div>
       </aside>
 
       <main class="main-panel">
+        <h1 class="sr-only">绘画工作台</h1>
         <div class="toolbar">
           <div class="tool-group" role="group" aria-label="编辑工具">
-            <button class="tool-btn" type="button" data-tool="select" title="选择区域 (V)" aria-label="选择区域" aria-pressed="false"><svg aria-hidden="true"><use href="#i-select"/></svg><span>选择</span></button>
+            <button class="tool-btn" type="button" data-tool="select" title="选择和拖动区域 (V)" aria-label="选择区域" aria-pressed="false"><svg aria-hidden="true"><use href="#i-select"/></svg><span>选择</span></button>
             <button class="tool-btn active" type="button" data-tool="region" title="框选新区域 (R)" aria-label="框选新区域" aria-pressed="true"><svg aria-hidden="true"><use href="#i-region"/></svg><span>框选</span></button>
             <button class="tool-btn" type="button" data-tool="pen" title="画笔 (P)" aria-label="画笔" aria-pressed="false"><svg aria-hidden="true"><use href="#i-pen"/></svg><span>画笔</span></button>
             <button class="tool-btn" type="button" data-tool="eraser" title="橡皮擦 (E)" aria-label="橡皮擦" aria-pressed="false"><svg aria-hidden="true"><use href="#i-eraser"/></svg><span>橡皮</span></button>
           </div>
-          <div class="tool-options"><label class="color-option">颜色<input id="stroke-color" type="color" value="#232c49" aria-label="画笔颜色" /></label><label class="size-option">大小<input id="stroke-size" type="range" min="1" max="100" value="4" aria-label="笔刷大小" /><output id="size-value" for="stroke-size">4</output><span>px</span></label></div>
+          <div class="tool-options"><button id="color-trigger" type="button" class="color-trigger" aria-label="画笔颜色，当前 #232C49" aria-haspopup="dialog"><span class="color-swatch" aria-hidden="true"></span><span>颜色</span><span aria-hidden="true">⌄</span></button><label class="size-option">大小<input id="stroke-size" type="range" min="1" max="100" value="4" aria-label="笔刷大小" /><output id="size-value" for="stroke-size">4</output><span>px</span></label></div>
         </div>
         <section id="brushbar" class="brushbar hidden" aria-label="笔刷设置">
           <div class="brush-controls">
@@ -94,12 +115,26 @@
             </svg>
             <div id="canvas-empty" class="canvas-empty" aria-hidden="true"><strong>从一个框开始</strong><span>拖拽框选区域，然后在框内绘画</span></div>
           </div>
-          <p id="canvas-help" class="canvas-help">R 框选 · V 选择 · P 画笔 · E 橡皮 · Esc 取消当前操作</p>
+          <p id="canvas-help" class="canvas-help">R 框选 · V 选择/拖动 · P 画笔 · E 橡皮 · Ctrl/Cmd+S 保存</p>
           <p id="mode-hint" class="mode-hint" role="status" aria-live="polite">拖拽创建区域，完成后自动切换画笔。</p>
         </div>
         <footer class="statusbar"><span id="status-mode">框选新区域</span><span id="status-count">0 个区域 · 0 条笔画</span><span id="coordinates">X — · Y —</span></footer>
       </main>
     </div>
   </div>
+  <dialog id="new-dialog" class="app-dialog" aria-labelledby="new-heading" aria-describedby="new-description"><form id="new-form"><span class="eyebrow">NEW DRAWING</span><h2 id="new-heading">一张新的画布</h2><p id="new-description">从空白开始，随时保存，随时继续。</p><label for="new-title">绘画名称</label><input id="new-title" type="text" maxlength="80" placeholder="例如：周末的色彩练习" autocomplete="off" /><div class="canvas-spec"><span>白色画布</span><strong>1200 × 760 px</strong></div><p id="new-error" class="form-error" role="alert"></p><div class="dialog-actions"><button id="new-cancel" type="button" class="secondary-btn">取消</button><button id="new-submit" type="submit" class="primary-btn">创建绘画</button></div></form></dialog>
+  <dialog id="confirm-dialog" class="app-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description"><form method="dialog"><h2 id="confirm-title">还有未保存的修改</h2><p id="confirm-description"></p><div class="dialog-actions"><button id="confirm-cancel" class="secondary-btn" value="cancel">取消</button><button id="confirm-discard" class="secondary-btn danger-text" value="discard">不保存并离开</button><button id="confirm-save" class="primary-btn" value="save">保存并离开</button></div></form></dialog>
+
+  <dialog id="color-dialog" class="color-dialog" aria-labelledby="color-heading" aria-describedby="color-help">
+    <div class="color-dialog-heading"><div><span class="eyebrow">COLOR STUDIO</span><h2 id="color-heading">选择画笔颜色</h2></div><button id="color-close" class="icon-btn" type="button" aria-label="关闭色轮">×</button></div>
+    <p id="color-help">外环选色相，内面板调整饱和度与明度。</p>
+    <canvas id="color-wheel" width="480" height="480" aria-hidden="true"></canvas>
+    <div class="color-reading"><span id="color-current" class="current-color" aria-hidden="true"></span><div><label for="color-hex">HEX</label><input id="color-hex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-describedby="color-error" /><span id="color-rgb"></span></div></div>
+    <p id="color-error" class="form-error" role="status"></p>
+    <div class="color-ranges"><label for="color-hue">色相<output id="color-hue-value" for="color-hue"></output></label><input id="color-hue" type="range" min="0" max="359" value="226" /><label for="color-saturation">饱和度<output id="color-saturation-value" for="color-saturation"></output></label><input id="color-saturation" type="range" min="0" max="100" value="50" /><label for="color-value">明度<output id="color-value-value" for="color-value"></output></label><input id="color-value" type="range" min="0" max="100" value="29" /></div>
+    <div class="color-palette" role="group" aria-label="常用颜色"><button type="button" data-color="#232c49" aria-label="深墨蓝"></button><button type="button" data-color="#ffffff" aria-label="纯白"></button><button type="button" data-color="#e85d45" aria-label="朱红"></button><button type="button" data-color="#e8b34a" aria-label="暖金"></button><button type="button" data-color="#318777" aria-label="青绿"></button><button type="button" data-color="#5277bd" aria-label="湖蓝"></button><button type="button" data-color="#8c60a5" aria-label="烟紫"></button></div>
+    <button id="color-done" class="primary-btn color-done" type="button">完成</button>
+  </dialog>
+  <div id="app-notice" class="app-notice hidden" role="alert"><span id="notice-text"></span><button id="notice-close" class="icon-btn" type="button" aria-label="关闭提示">×</button></div>
 </body>
 </html>

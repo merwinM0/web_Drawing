@@ -103,6 +103,37 @@ test("输入数据与历史快照隔离，重复或空名称不污染历史", ()
   expect(store.selected?.marks[0]!.points[0]!.x).toBe(10);
 });
 
+test("移动区域同时保留身份、局部笔画和绑定，一次移动只有一个撤销步骤", () => {
+  const store = twoRegions();
+  store.appendMark("upper", mark);
+  store.selected!.binding = { event: "activate", action: "example", payload: { key: 1 } };
+  const before = structuredClone(store.selected!);
+  expect(store.move("upper", { x: 400, y: 300 })).toBe(true);
+  expect(store.selected).toEqual({ ...before, rect: { ...before.rect, x: 400, y: 300 } });
+  store.undo();
+  expect(store.selected).toEqual(before);
+  store.redo();
+  expect(store.selected!.rect.x).toBe(400);
+  expect(store.move("upper", { x: 1e4, y: -10 })).toBe(true);
+  expect(store.selected!.rect).toMatchObject({ x: 1000, y: 0 });
+  expect(store.move("upper", { x: NaN, y: 0 })).toBe(false);
+  expect(store.move("missing", { x: 10, y: 10 })).toBe(false);
+});
+
+test("重新打开文档会隔离输入并清空跨作品的历史", () => {
+  const store = twoRegions();
+  const saved = structuredClone(store.state.regions);
+  store.rename("改动");
+  store.load(saved);
+  expect(store.canUndo).toBe(false);
+  expect(store.canRedo).toBe(false);
+  expect(store.selected!.id).toBe("upper");
+  saved[1]!.name = "外部修改";
+  expect(store.selected!.name).toBe("区域 2");
+  store.load([]);
+  expect(store.selected).toBeUndefined();
+});
+
 test("历史最多保留 80 个快照", () => {
   const store = new EditorStore();
   store.create(rect, "one");

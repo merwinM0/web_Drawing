@@ -3,7 +3,7 @@ import type { Page } from "playwright";
 import type { DrawingDocument, Mark, Region } from "../src/document";
 import { renderSVG } from "../src/render";
 
-type Helpers = {
+export type Helpers = {
   point: (page: Page, x: number, y: number) => Promise<{ x: number; y: number }>;
   drag: (page: Page, from: [number, number], to: [number, number]) => Promise<void>;
   drawing: (page: Page) => Promise<DrawingDocument>;

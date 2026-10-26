@@ -41,6 +41,14 @@ export function localPoint(rect: Rect, point: Point): Point {
   return { x: point.x - rect.x, y: point.y - rect.y };
 }
 
+export function movedRect(rect: Rect, position: Point): Rect {
+  return {
+    ...rect,
+    x: Math.max(0, Math.min(WIDTH - rect.width, position.x)),
+    y: Math.max(0, Math.min(HEIGHT - rect.height, position.y)),
+  };
+}
+
 export function pathData(points: Point[]): string {
   if (points.length === 0) return "";
   const coords = (point: Point) => `${point.x.toFixed(1)} ${point.y.toFixed(1)}`;

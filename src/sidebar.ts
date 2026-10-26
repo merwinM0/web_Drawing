@@ -13,6 +13,12 @@ export class RegionPanel {
       store.rename((event.target as HTMLInputElement).value);
       onEdit();
     });
+    for (const axis of ["x", "y"] as const) {
+      $<HTMLInputElement>(`region-${axis}`).addEventListener("change", event => {
+        if (store.selected) store.move(store.selected.id, { ...store.selected.rect, [axis]: Number((event.target as HTMLInputElement).value) });
+        onEdit();
+      });
+    }
     $("layer-up").addEventListener("click", () => { store.reorder(1); onEdit(); });
     $("layer-down").addEventListener("click", () => { store.reorder(-1); onEdit(); });
     $("delete-region").addEventListener("click", () => {
@@ -32,7 +38,12 @@ export class RegionPanel {
       onCreate(rect);
     });
     $("toggle-sidebar").addEventListener("click", () => this.toggle());
-    if (window.matchMedia("(max-width: 600px)").matches) this.toggle();
+    const compact = window.matchMedia("(max-width: 600px)");
+    const collapseOnSmallScreen = () => {
+      if (compact.matches && !$("sidebar").classList.contains("collapsed")) this.toggle();
+    };
+    compact.addEventListener("change", collapseOnSmallScreen);
+    collapseOnSmallScreen();
   }
 
   private toggle(): void {
@@ -77,7 +88,11 @@ export class RegionPanel {
     if (!selected) return;
     $<HTMLInputElement>("region-name").value = selected.name;
     const { x, y, width, height } = selected.rect;
-    $("region-geometry").textContent = `X ${Math.round(x)} · Y ${Math.round(y)} · ${Math.round(width)} × ${Math.round(height)} px`;
+    $("region-geometry").textContent = `${Math.round(width)} × ${Math.round(height)} px · V 拖动，方向键微调`;
+    for (const [axis, value, max] of [["x", x, 1200 - width], ["y", y, 760 - height]] as const) {
+      const input = $<HTMLInputElement>(`region-${axis}`);
+      input.value = String(Math.round(value * 10) / 10); input.max = String(max);
+    }
     const index = regions.findIndex(region => region.id === selectedRegionId);
     $<HTMLButtonElement>("layer-up").disabled = index === regions.length - 1;
     $<HTMLButtonElement>("layer-down").disabled = index === 0;

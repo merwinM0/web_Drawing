@@ -4,11 +4,12 @@ import { chromium, type Page } from "playwright";
 import type { DrawingDocument, Mark, Region } from "../src/document";
 import { renderSVG } from "../src/render";
 import { checkBrushes } from "./brush-browser";
+import { checkLibrary } from "./library-browser";
 
 const probe = Bun.serve({ port: 0, fetch: () => new Response() });
 const port = probe.port!;
 probe.stop(true);
-const server = Bun.spawn(["bun", "server.ts"], { env: { ...process.env, PORT: String(port) }, stdout: "ignore", stderr: "inherit" });
+const server = Bun.spawn(["bun", process.env.E2E_STATIC ? "tests/static-server.ts" : "server.ts"], { env: { ...process.env, PORT: String(port) }, stdout: "ignore", stderr: "inherit" });
 const url = `http://localhost:${port}`;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 
@@ -51,9 +52,14 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   const errors: string[] = [];
+  page.on("dialog", dialog => void dialog.accept());
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(url);
+  await page.locator("#new-drawing").click();
+  await page.locator("#new-title").fill("回归绘画");
+  await page.locator("#new-submit").click();
+  await page.locator("#workbench").waitFor({ state: "visible" });
   await page.waitForSelector('[data-tool="region"][aria-pressed="true"]');
   assert.equal(await page.locator('[data-tool="button"]').count(), 0);
   await page.getByRole("button", { name: "画笔", exact: true }).click();
@@ -194,6 +200,7 @@ try {
     assert.deepEqual(accessibility.violations.map(issue => ({ id: issue.id, targets: issue.nodes.map(node => node.target) })), [], `${width}px 存在无障碍问题`);
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/${width}.png`, fullPage: true });
   }
+  await checkLibrary(browser, url, { point, drag, drawing, download });
   assert.deepEqual(errors, [], "浏览器不应有运行错误");
   console.log("通过：320 / 768 / 1024 / 1440 响应式布局、小屏精确创建与 axe WCAG 2.1 AA 检查");
 } finally {
